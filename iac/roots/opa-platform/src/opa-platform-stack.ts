@@ -116,7 +116,7 @@ export class OPAPlatformStack extends cdk.Stack {
       opaEnv: opaParams,
       vpc: network.vpc,
       kmsKey: key,
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MEDIUM),
     });
 
     // Create Solution DynamoDB Tables - SecurityRoleMapping

@@ -19,7 +19,22 @@ if [[ -z "$GITLAB_TOKEN" ]]; then
 fi
 
 # Try to create a new project if one doesn't exist (will fail through)
-curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"internal\" }"
+retry_count=0
+max_retries=30
+while [ $retry_count -lt $max_retries ]; do
+  response=$(curl -s -w "%{http_code}" -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"internal\" }")
+  http_code=${response: -3}
+  if [[ $http_code -eq 401 ]]; then
+    retry_count=$((retry_count + 1))
+    echo "401 error ($http_code), retrying... ($retry_count/$max_retries)"
+    sleep 10
+  elif [[ $http_code -eq 400 ]]; then
+    echo "Project already exists (400 error), proceeding with existing project"
+    break
+  else
+    break
+  fi
+done
 
 # Take backup of Git configs if they are present
 if [ -f "$appDir/git-temp/backstage-reference/.git/config" ]; then

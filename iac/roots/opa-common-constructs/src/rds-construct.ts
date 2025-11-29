@@ -52,11 +52,6 @@ export class RdsConstruct extends Construct {
       writer: rds.ClusterInstance.provisioned('writer', {
         instanceType: props.instanceType
       }),
-      readers: [
-        rds.ClusterInstance.provisioned('reader', {
-          instanceType: props.instanceType
-        }),
-      ],
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
