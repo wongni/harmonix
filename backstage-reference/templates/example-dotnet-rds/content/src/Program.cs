@@ -37,8 +37,6 @@ app.MapGet("/health", () => new
     status = "OK"
 });
 
-app.MapGet("/error", () => throw new Exception("Intentional error to demo seeing stack traces in logs"));
-
 app.Run($"http://0.0.0.0:${{ values.appPort }}");
 
 async Task<DbSecret> GetSecretValue(string secretName, string region)
