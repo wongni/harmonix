@@ -15,6 +15,8 @@ spec:
         - ./example-eks-nodejs-rds-kustomize/template.yaml
         - ./example-eks-nodejs-rds-helm/template.yaml
         - ./example-nodejs-microservice/template.yaml
+        - ./example-dotnet-microservice/template.yaml
+        - ./example-dotnet-rds/template.yaml
         - ./example-python-flask/template.yaml
         - ./example-python-flask-eks/template.yaml
         - ./example-tf-nodejs/template.yaml
