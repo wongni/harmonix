@@ -33,6 +33,29 @@ function getEnvVarValue(envVar: string | undefined): string {
   return envVar;
 }
 
+function createManagedSecret(
+  scope: Construct,
+  id: string,
+  secretName: string,
+  encryptionKey: kms.Key
+): secretsmanager.Secret {
+  const secret = new secretsmanager.Secret(scope, id, {
+    generateSecretString: { passwordLength: 32, excludePunctuation: true },
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+    secretName,
+    encryptionKey,
+  });
+
+  NagSuppressions.addResourceSuppressions(secret, [
+    {
+      id: "AwsSolutions-SMG4",
+      reason: "Rotation is not necessary.",
+    },
+  ]);
+
+  return secret;
+}
+
 export interface OPAPlatformStackProps extends cdk.StackProps {
   // readonly config: BackstageInfraConfig;
 }
@@ -175,26 +198,23 @@ export class OPAPlatformStack extends cdk.Stack {
     gitlabHostingConstruct.node.addDependency(gitlabSecret);
     gitlabHostingConstruct.node.addDependency(gitlabVersionParam);
 
-    const shouldCreateAutomationSecret: boolean = getEnvVarValue(process.env.CREATE_AUTOMATION_SECRET).toLocaleLowerCase() === "true";
-    let automationSecret: secretsmanager.Secret | undefined;
-    if (shouldCreateAutomationSecret) {
-      automationSecret = new secretsmanager.Secret(this, `${opaParams.prefix}-automation-secret`, {
-        generateSecretString: { passwordLength: 32, excludePunctuation:true },
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-        secretName: `${opaParams.prefix}-${opaParams.envName}-automation-secret`,
-        encryptionKey: key,
-      });
+    const automationSecret = getEnvVarValue(process.env.CREATE_AUTOMATION_SECRET).toLowerCase() === "true"
+      ? createManagedSecret(
+          this,
+          `${opaParams.prefix}-automation-secret`,
+          `${opaParams.prefix}-${opaParams.envName}-automation-secret`,
+          key
+        )
+      : undefined;
 
-      NagSuppressions.addResourceSuppressions(automationSecret, [
-        {
-          id: "AwsSolutions-SMG4",
-          reason:
-            "Rotation is not necessary.",
-        },
-      ]);
-    }
-
-    
+    const mcpTokenSecret = getEnvVarValue(process.env.CREATE_MCP_TOKEN_SECRET).toLowerCase() === "true"
+      ? createManagedSecret(
+          this,
+          `${opaParams.prefix}-mcp-token-secret`,
+          `${opaParams.prefix}-${opaParams.envName}-mcp-token-secret`,
+          key
+        )
+      : undefined;    
 
     backstageConstruct = new BackstageFargateServiceConstruct(this, `${opaParams.prefix}-fargate-service`, {
       network: network,
@@ -214,6 +234,7 @@ export class OPAPlatformStack extends cdk.Stack {
       customerLogo,
       customerLogoIcon,
       automationSecret,
+      mcpTokenSecret,
     });
 
     // Create EC2 Gitlab Runner

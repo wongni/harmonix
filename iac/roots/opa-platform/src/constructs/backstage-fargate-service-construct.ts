@@ -94,10 +94,16 @@ export interface BackstageFargateServiceConstructProps extends StackProps {
    * URL to the icon of the Backstage hosting organization logo
    */
   readonly customerLogoIcon: string;
-    /**
+
+  /**
    * A reference to the Secrets Manager secret where the automation key is stored
    */
-    readonly automationSecret?: ISecret;
+  readonly automationSecret?: ISecret;
+
+  /**
+   * A reference to the Secrets Manager secret where the MCP token is stored
+   */
+  readonly mcpTokenSecret?: ISecret;
 }
 
 const defaultProps: Partial<BackstageFargateServiceConstructProps> = {
@@ -187,6 +193,11 @@ export class BackstageFargateServiceConstruct extends Construct {
     // Add the automation secret if it exists.
     if (props.automationSecret) {
       secretVars.AUTOMATION_KEY = ecs.Secret.fromSecretsManager(props.automationSecret);
+    }
+
+    // Add the MCP token secret if it exists.
+    if (props.mcpTokenSecret) {
+      secretVars.MCP_TOKEN = ecs.Secret.fromSecretsManager(props.mcpTokenSecret);
     }
 
     albFargateService = new ecsPatterns.ApplicationLoadBalancedFargateService(
