@@ -253,7 +253,9 @@ export class AppsPlatformService implements IAppsPlatformService{
       );
       throw new Error(`Failed to retrieve ${filePath} for ${repo.gitRepoName}. Response: ${result}`);
     } else {
-      return resultBody;
+      return this.git.gitProvider === GitProviders.GITLAB 
+        ? Buffer.from(resultBody, 'base64').toString('utf-8')
+        : resultBody;
     }
   }
 
@@ -476,16 +478,7 @@ export class AppsPlatformService implements IAppsPlatformService{
 
     const result = await this.git.gitProviderImpl.commitContent(change, repo, gitToken);
     console.log(result)
-    let resultBody;
-
-    if (this.git.gitProvider===GitProviders.GITLAB)
-      {
-        resultBody = await result.value.json();
-      }
-      else if (this.git.gitProvider===GitProviders.GITHUB) 
-      {
-        resultBody = result.message
-      }
+    let resultBody = result.message
     
 
     
