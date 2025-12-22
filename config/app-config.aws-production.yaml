@@ -21,6 +21,10 @@ backend:
   listen:
     port: 8080
 
+  actions:
+    pluginSources:
+      - catalog
+      - scaffolder
   auth:
     externalAccess:
       - type: static
@@ -30,6 +34,13 @@ backend:
         # Restrictions are optional; see below
         accessRestrictions:
           - plugin: scaffolder
+          - plugin: catalog
+      - type: static
+        options:
+          token: ${MCP_TOKEN}
+          subject: mcp-clients
+        accessRestrictions:
+          - plugin: mcp-actions
           - plugin: catalog
   csp:
     connect-src: ["'self'", "http:", "https:"]
