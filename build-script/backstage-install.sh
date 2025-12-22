@@ -74,8 +74,10 @@ cp $harmonixHomeDir/config/app-config.aws-production.yaml $backstageDir
 echo "" #intentional blank line
 echo "Installing backend dependencies"
 yarn --cwd packages/backend add \
+    "@backstage/plugin-auth-backend-module-okta-provider@^0.2.10" \
     "@backstage/plugin-catalog-backend-module-github@^0.7.11" \
     "@backstage/plugin-catalog-backend-module-gitlab@^0.6.4" \
+    "@backstage/plugin-mcp-actions-backend@^0.1.6" \
     "@backstage/plugin-permission-backend@^0.5.55" \
     "@roadiehq/catalog-backend-module-okta@^1.1.2" \
     "@immobiliarelabs/backstage-plugin-gitlab-backend@^6.11.0" \
