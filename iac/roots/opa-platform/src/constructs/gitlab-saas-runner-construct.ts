@@ -61,7 +61,7 @@ export class GitlabSaasRunnerConstruct extends Construct {
           resources: ["*"],
           // conditions: {
           //   StringEquals: {
-          //     "aws:ResourceAccount": props.backstageEnv.awsAccount,
+          //     "aws:ResourceAccount": props.opaEnv.awsAccount,
           //   },
           // },
         }),
@@ -123,11 +123,11 @@ export class GitlabSaasRunnerConstruct extends Construct {
     // save root role in a param
     const roleNameParam = new ssm.StringParameter(
       this,
-      `${props.backstageEnv.prefix}PipelineRoleName`,
+      `${props.opaEnv.prefix}PipelineRoleName`,
       {
         allowedPattern: ".*",
         description: `The OPA Platform Pipeline Role name`,
-        parameterName: `/apps/${props.backstageEnv.prefix}/iam/role/pipeline/name`,
+        parameterName: `/apps/${props.opaEnv.prefix}/iam/role/pipeline/name`,
         stringValue: this.iamRole.roleName,
       },
     );
@@ -138,11 +138,11 @@ export class GitlabSaasRunnerConstruct extends Construct {
 
     const roleArnParam = new ssm.StringParameter(
       this,
-      `${props.backstageEnv.prefix}PipelineRoleArn`,
+      `${props.opaEnv.prefix}PipelineRoleArn`,
       {
         allowedPattern: ".*",
         description: `The OPA Platform Pipeline Role ARN`,
-        parameterName: `/apps/${props.backstageEnv.prefix}/iam/role/pipeline/arn`,
+        parameterName: `/apps/${props.opaEnv.prefix}/iam/role/pipeline/arn`,
         stringValue: this.iamRole.roleArn,
       },
     );

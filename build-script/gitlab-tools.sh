@@ -19,7 +19,7 @@ if [[ -z "$GITLAB_TOKEN" ]]; then
 fi
 
 # Try to create a new project if one doesn't exist (will fail through)
-curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"internal\" }"
+curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }"
 
 # Take backup of Git configs if they are present
 if [ -f "$appDir/git-temp/backstage-reference/.git/config" ]; then
@@ -32,8 +32,8 @@ if [ -d "$appDir/git-temp" ]; then
 fi
 # Make tmp directory to add files that will be comitted to repo
 mkdir -p $appDir/git-temp
-echo -e "\nCloning from https://$GITLAB_HOSTNAME/opa-admin/backstage-reference.git\n"
-git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/opa-admin/backstage-reference.git"
+echo -e "\nCloning from https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git\n"
+git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
 
 # Reinstate Git configs if available
 if [ -f "$appDir/git-config-temp" ]; then
@@ -76,7 +76,7 @@ if [[ ! -z "$IS_DEFENDER" ]] && ! grep -q "\[defender\]" .git/config ; then
   echo -e "\nGit Defender detected. Populating git-temp/.git/config for Defender.\n"
   echo -e "" >> .git/config
   echo -e "[defender]" >> .git/config
-  echo -e "\tallowrepo = https://$GITLAB_HOSTNAME/opa-admin/backstage-reference.git" >> .git/config
+  echo -e "\tallowrepo = https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git" >> .git/config
   echo -e "\tallowemail = $(whoami)@amazon.com" >> .git/config
   echo -e "\tregistered = true" >> .git/config
   echo -e "" >> .git/config

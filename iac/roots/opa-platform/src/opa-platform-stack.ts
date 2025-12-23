@@ -293,7 +293,7 @@ export class OPAPlatformStack extends cdk.Stack {
             new iam.ArnPrincipal(gitlabRunner.iamRole.roleArn),
             // new iam.ArnPrincipal(backstageRootRole.iamUser.userArn)
           ),
-          roleName: "opa-envprovisioning-role", // Optional: specify a role name
+          roleName: `${opaParams.prefix}-envprovisioning-role`, // Optional: specify a role name
         },
       );
 
@@ -326,18 +326,18 @@ export class OPAPlatformStack extends cdk.Stack {
         stringValue: envProvisioningRole.roleArn,
       });
 
-      new cdk.CfnOutput(this, `${opaParams.prefix}-envprovisioning-role-arn`, {
+      new cdk.CfnOutput(this, `${opaParams.prefix}-envprovisioning-role-arn-output`, {
         value: envProvisioningRole.roleArn,
         description: "Role will be assumed to provision environments",
       });
     } else {
       new RoleConstruct(this, `${opaParams.prefix}EnvironmentProvisioning`, {
-        backstageEnv: opaParams,
+        opaEnv: opaParams,
         KMSkey: key,
         vpcCollection: [network.vpc],
         ecsCollection: [backstageConstruct.cluster],
-        backstageRoleArn: backstageRootRole.IAMRole.roleArn,
-        gitlabSaasRunnerRoleArn: gitlabRunner.iamRole.roleArn,
+        rootRoleArn: backstageRootRole.IAMRole.roleArn,
+        gitlabRunnerRoleArn: gitlabRunner.iamRole.roleArn,
       });
     }
     

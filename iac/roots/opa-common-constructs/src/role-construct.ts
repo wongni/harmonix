@@ -14,7 +14,7 @@ import { OPAEnvironmentParams } from "./opa-environment-params";
 export interface RoleConstructProps extends cdk.StackProps {
   readonly opaEnv: OPAEnvironmentParams;
   KMSkey: kms.IKey;
-  vpcCollection: ec2.Vpc[];
+  vpcCollection: ec2.IVpc[];
   ecsCollection: ecs.ICluster[];
   rootRoleArn?: string;
   gitlabRunnerRoleArn?: string;
@@ -39,7 +39,6 @@ export class RoleConstruct extends Construct {
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
         // new iam.ArnPrincipal(`arn:aws:iam::${props.config.Account}:role/${props.rootRole}`)
-        new iam.ArnPrincipal(props.rootRoleArn ? props.rootRoleArn : "")
         new iam.ArnPrincipal(props.gitlabRunnerRoleArn ? props.gitlabRunnerRoleArn : "")
       ),
       // : new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
