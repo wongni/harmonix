@@ -71,7 +71,7 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
               - aws-app
 
@@ -129,9 +129,10 @@ spec:
       name: Fetch Serverless Infrastructure as Code
       action: fetch:template
       input: 
-        url: https://{{ gitlab_hostname }}/opa-admin/backstage-reference/-/tree/main/common/aws_serverless_api
+        url: https://{{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_serverless_api
         targetPath: ./.iac
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id }}
           app_env_plaintext: ""
 
@@ -141,6 +142,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id | replace(" ", "") }}
           title: ${{ parameters.component_id }}
           description: ${{ parameters.description }}

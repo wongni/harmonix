@@ -77,6 +77,8 @@ export class OPAPlatformStack extends cdk.Stack {
       Boolean(getEnvVarValue(
         process.env.GITLAB_PROVISIONING_ENABLED)
       ) || false;
+    const isPlatformProvisioningEnabled =
+      getEnvVarValue(process.env.PLATFORM_PROVISIONING_ENABLED)?.toLowerCase() !== "false";
 
     const sAllowedIPs = getEnvVarValue(process.env.ALLOWED_IPS);
     const allowedIPs = sAllowedIPs?.split(",").map((s) => {
@@ -120,41 +122,48 @@ export class OPAPlatformStack extends cdk.Stack {
       githubUrl: `https://${getEnvVarValue(process.env.GITHUB_HOSTNAME)}` || "https://github.com",
     });
     
-    // Create an ECR repository to contain backstage container images
-    const ecrRepository = new ecr.Repository(this, `${opaParams.prefix}-ecr-repository`, {
-      repositoryName: `${opaParams.prefix}-backstage`,
-      imageScanOnPush: true,
-      encryption: ecr.RepositoryEncryption.KMS,
-      encryptionKey: key,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      emptyOnDelete: true,
-    });
+    let ecrRepository: ecr.Repository | undefined;
+    let backstageECRParam: ssm.StringParameter | undefined;
+    let network: NetworkConstruct | undefined;
+    let rdsConstruct: RdsConstruct | undefined;
 
-    // Save ECR Repo in an SSM Parameter
-    const backstageECRParam = new ssm.StringParameter(this, `${opaParams.prefix}-backstage-ecr-param`, {
-      allowedPattern: ".*",
-      description: "The ECR Key for Backstage Solution",
-      parameterName: `/${opaParams.prefix}/backstage-ecr`,
-      stringValue: ecrRepository.repositoryName,
-    });
+    if (isPlatformProvisioningEnabled) {
+      // Create an ECR repository to contain backstage container images
+      ecrRepository = new ecr.Repository(this, `${opaParams.prefix}-ecr-repository`, {
+        repositoryName: `${opaParams.prefix}-backstage`,
+        imageScanOnPush: true,
+        encryption: ecr.RepositoryEncryption.KMS,
+        encryptionKey: key,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        emptyOnDelete: true,
+      });
 
-    // Create VPC for hosting backstage
-    const network = new NetworkConstruct(this, "Backstage-Network", {
-      opaEnv: opaParams,
-      cidrRange: getEnvVarValue(process.env.BACKSTAGE_NETWORK_CIDR_RANGE) || "10.0.0.0/16",
-      isIsolated: false,
-      allowedIPs,
-      publicVpcNatGatewayCount: +(getEnvVarValue(process.env.NUM_PUBLIC_NATGW) || 3),
-      vpcAzCount: +(getEnvVarValue(process.env.NUM_AZ) || 3),
-    });
+      // Save ECR Repo in an SSM Parameter
+      backstageECRParam = new ssm.StringParameter(this, `${opaParams.prefix}-backstage-ecr-param`, {
+        allowedPattern: ".*",
+        description: "The ECR Key for Backstage Solution",
+        parameterName: `/${opaParams.prefix}/backstage-ecr`,
+        stringValue: ecrRepository.repositoryName,
+      });
 
-    // Create DB for backstage platform
-    const rdsConstruct = new RdsConstruct(this, "rds-construct", {
-      opaEnv: opaParams,
-      vpc: network.vpc,
-      kmsKey: key,
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
-    });
+      // Create VPC for hosting backstage
+      network = new NetworkConstruct(this, "Backstage-Network", {
+        opaEnv: opaParams,
+        cidrRange: getEnvVarValue(process.env.BACKSTAGE_NETWORK_CIDR_RANGE) || "10.0.0.0/16",
+        isIsolated: false,
+        allowedIPs,
+        publicVpcNatGatewayCount: +(getEnvVarValue(process.env.NUM_PUBLIC_NATGW) || 3),
+        vpcAzCount: +(getEnvVarValue(process.env.NUM_AZ) || 3),
+      });
+
+      // Create DB for backstage platform
+      rdsConstruct = new RdsConstruct(this, "rds-construct", {
+        opaEnv: opaParams,
+        vpc: network.vpc,
+        kmsKey: key,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
+      });
+    }
 
     // Create Solution DynamoDB Tables - SecurityRoleMapping
     const securityMappingTableConstruct = new DynamoDBConstruct(this, "security-mapping-table", {
@@ -163,19 +172,22 @@ export class OPAPlatformStack extends cdk.Stack {
       kmsKey: key,
     });
 
-    // Create Master role
-    const backstageRootRole = new OPARootRoleConstruct(this, "backstage-master-role", {
-      opaEnv: opaParams,
-      securityTableName: securityMappingTableConstruct.table.tableName,
-      KMSkey: key,
-      network,
-    });
+    let backstageRootRole: OPARootRoleConstruct | undefined;
+    if (isPlatformProvisioningEnabled && network) {
+      // Create Master role
+      backstageRootRole = new OPARootRoleConstruct(this, "backstage-master-role", {
+        opaEnv: opaParams,
+        securityTableName: securityMappingTableConstruct.table.tableName,
+        KMSkey: key,
+        network,
+      });
+    }
 
     const customerName = getEnvVarValue(process.env.CUSTOMER_NAME) || "AWS";
     const customerLogo = getEnvVarValue(process.env.CUSTOMER_LOGO) || "https://companieslogo.com/img/orig/AMZN_BIG-accd00da.png";
     const customerLogoIcon = getEnvVarValue(process.env.CUSTOMER_LOGO_ICON) || "https://companieslogo.com/img/orig/AMZN.D-13fddc58.png";
 
-    let backstageConstruct: BackstageFargateServiceConstruct;
+    let backstageConstruct: BackstageFargateServiceConstruct | undefined;
 
     const hostedZoneName = getEnvVarValue(process.env.R53_HOSTED_ZONE_NAME) || "";
     if (!hostedZoneName) {
@@ -197,11 +209,11 @@ export class OPAPlatformStack extends cdk.Stack {
     
     let gitlabHostingConstruct: GitlabHostingConstruct | undefined;
     let gitlabRunner: GitlabRunnerConstruct;
-    if (isGitlabProvisioningEnabled) {
+    if (isGitlabProvisioningEnabled && isPlatformProvisioningEnabled && network) {
       // Create a secured EC2 Hosted Gitlab
       gitlabHostingConstruct = new GitlabHostingConstruct(this, "GitlabHosting-Construct", {
           opaEnv: opaParams,
-          network: network,
+          network,
           accessLogBucket: network.logBucket,
           instanceDiskSize: 3000,
           instanceSize: ec2.InstanceSize.XLARGE,
@@ -262,30 +274,32 @@ export class OPAPlatformStack extends cdk.Stack {
       );
     }
 
-    backstageConstruct = new BackstageFargateServiceConstruct(this, `${opaParams.prefix}-fargate-service`, {
-      network: network,
-      opaEnv: opaParams,
-      ecrRepository,
-      ecrKmsKey: key,
-      accessLogBucket: network.logBucket,
-      dbCluster: rdsConstruct.cluster,
-      oktaSecret,
-      gitlabAdminSecret: scmAndPipelineInfoConstruct.gitlabSecret,
-      githubAdminSecret: scmAndPipelineInfoConstruct.githubSecret,
-      taskRole: backstageRootRole.IAMRole,
-      gitlabHostname: scmAndPipelineInfoConstruct.gitlabHostNameParam?.stringValue || "",
-      githubHostname: scmAndPipelineInfoConstruct.githubHostNameParam?.stringValue || "",
-      hostedZone,
-      customerName,
-      customerLogo,
-      customerLogoIcon,
-      automationSecret,
-      mcpTokenSecret,
-    });
+    if (isPlatformProvisioningEnabled && network && ecrRepository && rdsConstruct && backstageRootRole) {
+      backstageConstruct = new BackstageFargateServiceConstruct(this, `${opaParams.prefix}-fargate-service`, {
+        network,
+        opaEnv: opaParams,
+        ecrRepository,
+        ecrKmsKey: key,
+        accessLogBucket: network.logBucket,
+        dbCluster: rdsConstruct.cluster,
+        oktaSecret,
+        gitlabAdminSecret: scmAndPipelineInfoConstruct.gitlabSecret,
+        githubAdminSecret: scmAndPipelineInfoConstruct.githubSecret,
+        taskRole: backstageRootRole.IAMRole,
+        gitlabHostname: scmAndPipelineInfoConstruct.gitlabHostNameParam?.stringValue || "",
+        githubHostname: scmAndPipelineInfoConstruct.githubHostNameParam?.stringValue || "",
+        hostedZone,
+        customerName,
+        customerLogo,
+        customerLogoIcon,
+        automationSecret,
+        mcpTokenSecret,
+      });
+    }
 
     // Attach the AdministratorAccess policy to the role if required
     
-    if (isDangerousProvisioningAdminEnabled) {
+    if (isDangerousProvisioningAdminEnabled && isPlatformProvisioningEnabled && backstageRootRole) {
       // create the environment provisioning role.
       const envProvisioningRole = new iam.Role(this, "EnvProvisioningRole", {
           assumedBy: new iam.CompositePrincipal(
@@ -331,36 +345,75 @@ export class OPAPlatformStack extends cdk.Stack {
         description: "Role will be assumed to provision environments",
       });
     } else {
-      new RoleConstruct(this, `${opaParams.prefix}EnvironmentProvisioning`, {
-        opaEnv: opaParams,
-        KMSkey: key,
-        vpcCollection: [network.vpc],
-        ecsCollection: [backstageConstruct.cluster],
-        rootRoleArn: backstageRootRole.IAMRole.roleArn,
-        gitlabRunnerRoleArn: gitlabRunner.iamRole.roleArn,
+      if (isPlatformProvisioningEnabled && backstageRootRole) {
+        new RoleConstruct(this, `${opaParams.prefix}EnvironmentProvisioning`, {
+          opaEnv: opaParams,
+          KMSkey: key,
+          vpcCollection: network ? [network.vpc] : [],
+          ecsCollection: backstageConstruct ? [backstageConstruct.cluster] : [],
+          rootRoleArn: backstageRootRole.IAMRole.roleArn,
+          gitlabRunnerRoleArn: gitlabRunner.iamRole.roleArn,
+        });
+      }
+    }
+
+    // Create placeholder SSM parameters when platform provisioning is disabled
+    if (!isPlatformProvisioningEnabled) {
+      new ssm.StringParameter(this, `${opaParams.prefix}-platform-role-placeholder`, {
+        allowedPattern: ".*",
+        description: "Placeholder - Platform provisioning is disabled",
+        parameterName: `/${opaParams.prefix}/platform-role`,
+        stringValue: "NOT_CONFIGURED",
+      });
+
+      new ssm.StringParameter(this, `${opaParams.prefix}-pipeline-role-placeholder`, {
+        allowedPattern: ".*",
+        description: "Placeholder - Platform provisioning is disabled",
+        parameterName: `/${opaParams.prefix}/pipeline-role`,
+        stringValue: gitlabRunner.iamRole.roleName,
+      });
+
+      new ssm.StringParameter(this, `${opaParams.prefix}-provisioning-role-placeholder`, {
+        allowedPattern: ".*",
+        description: "Placeholder - Platform provisioning is disabled",
+        parameterName: `/${opaParams.prefix}/provisioning-role`,
+        stringValue: "NOT_CONFIGURED",
+      });
+
+      new ssm.StringParameter(this, `${opaParams.prefix}-provisioning-role-arn-placeholder`, {
+        allowedPattern: ".*",
+        description: "Placeholder - Platform provisioning is disabled",
+        parameterName: `/${opaParams.prefix}/provisioning-role-arn`,
+        stringValue: "NOT_CONFIGURED",
       });
     }
     
-    // Create a regional WAF Web ACL for load balancers
-    const wafConstruct = new Wafv2BasicConstruct(this, `${opaParams.prefix}-regional-wafAcl`, {
-      wafScope: WafV2Scope.REGIONAL,
-      region: cdk.Stack.of(this).region,
-    });
+    if (isPlatformProvisioningEnabled && backstageConstruct) {
+      // Create a regional WAF Web ACL for load balancers
+      const wafConstruct = new Wafv2BasicConstruct(this, `${opaParams.prefix}-regional-wafAcl`, {
+        wafScope: WafV2Scope.REGIONAL,
+        region: cdk.Stack.of(this).region,
+      });
 
-    // Associate the web ACL with load balancers
-    wafConstruct.addResourceAssociation(
-      `${opaParams.prefix}-backstage-alb-backstage-webacl-assoc`,
-      backstageConstruct.loadBalancer.loadBalancerArn
-    );
-    
-    if(isGitlabProvisioningEnabled && gitlabHostingConstruct) { wafConstruct.addResourceAssociation(
-      `${opaParams.prefix}-gitlab-alb-git-webacl-assoc`,
-      gitlabHostingConstruct.alb.loadBalancerArn
-    )};
+      // Associate the web ACL with load balancers
+      wafConstruct.addResourceAssociation(
+        `${opaParams.prefix}-backstage-alb-backstage-webacl-assoc`,
+        backstageConstruct.loadBalancer.loadBalancerArn
+      );
+      
+      if(isGitlabProvisioningEnabled && gitlabHostingConstruct) { 
+        wafConstruct.addResourceAssociation(
+          `${opaParams.prefix}-gitlab-alb-git-webacl-assoc`,
+          gitlabHostingConstruct.alb.loadBalancerArn
+        );
+      }
+    }
 
-    new cdk.CfnOutput(this, `${opaParams.prefix}-ecr-output`, {
-      value: backstageECRParam.parameterName,
-      description: "ECR repository for backstage platform images",
-    });
+    if (backstageECRParam) {
+      new cdk.CfnOutput(this, `${opaParams.prefix}-ecr-output`, {
+        value: backstageECRParam.parameterName,
+        description: "ECR repository for backstage platform images",
+      });
+    }
   }
 }

@@ -160,9 +160,9 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
-              - aws-environment-providers
+              - ${{ gitlab_user_name }}
   steps:
     - id: harmonixGetPlatformInfo
       name: Get Harmonix platform information
@@ -181,6 +181,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower | replace(" ", "") }}
           title: ${{ parameters.name }}
           description: ${{ parameters.env_description }}
@@ -200,13 +201,13 @@ spec:
       action: fetch:plain
       input:
         targetPath: ./.iac/opa-serverless-environment
-        url: "https://{{gitlab_hostname}}/opa-admin/backstage-reference/-/tree/main/environments/opa-serverless-environment"
+        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-serverless-environment"
     - id: fetchIacCommonConstructs
       name: Fetch IaC Common Constructs
       action: fetch:plain
       input:
         targetPath: ./.iac/opa-common-constructs
-        url: "https://{{gitlab_hostname}}/opa-admin/backstage-reference/-/tree/main/environments/opa-common-constructs"
+        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-common-constructs"
     - id: createYarnPackageFile
       name: Configure Yarn Package Manager
       action: harmonix:fs:write

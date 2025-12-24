@@ -58,11 +58,13 @@ cd $appDir/git-temp/backstage-reference;
 
 # Replace variable placeholders with env specific information
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    find . -type f -name "*.yaml" -exec sed -i "" "s/{{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/{{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 else
-    find . -type f -name "*.yaml" -exec sed -i "s/{{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/{{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 fi
 
 echo "Checking for git-defender"

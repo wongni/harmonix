@@ -70,7 +70,7 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
               - aws-app
 
@@ -123,9 +123,10 @@ spec:
       name: Fetch ECS Infrastructure as Code
       action: fetch:template
       input: 
-        url: https://{{ gitlab_hostname }}/opa-admin/backstage-reference/-/tree/main/common/aws_ecs
+        url: https://{{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_ecs
         targetPath: ./.iac
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id | lower }}
           appEnvPlaintext: ""
 
@@ -135,6 +136,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           appPort: "8080"
           component_id: ${{ parameters.component_id | lower | replace(" ", "") }}
           title: ${{ parameters.component_id }}

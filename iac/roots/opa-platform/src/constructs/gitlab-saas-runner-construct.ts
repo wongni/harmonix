@@ -89,7 +89,11 @@ export class GitlabSaasRunnerConstruct extends Construct {
     );
 
     this.iamRole = new iam.Role(this, `${name}Role`, {
-      assumedBy: new iam.OpenIdConnectPrincipal(this.iamOidcProvider, {}),
+      assumedBy: new iam.OpenIdConnectPrincipal(this.iamOidcProvider, {
+        StringLike: {
+          "gitlab.com:sub": "project_path:*:ref_type:branch:ref:*",
+        },
+      }),
       roleName: `${name}Role`,
       description: "IAM role assumed by the Gitlab Runner",
       managedPolicies: [

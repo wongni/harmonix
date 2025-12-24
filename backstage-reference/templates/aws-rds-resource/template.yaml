@@ -110,7 +110,7 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
               - aws-resources
 
@@ -157,9 +157,10 @@ spec:
       name: Fetch RDS Infrastructure as Code
       action: fetch:template
       input: 
-        url: https://{{ gitlab_hostname }}/opa-admin/backstage-reference/-/tree/main/common/aws_rds
+        url: https://{{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_rds
         targetPath: ./.iac
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id | lower}}
           appEnvPlaintext: ""
     - id: fetchBase
@@ -168,6 +169,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id | lower | replace(" ", "") }}
           title: ${{ parameters.component_id }}
           description: ${{ parameters.description }}

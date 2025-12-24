@@ -99,6 +99,9 @@ scaffolder:
   defaultAuthor:
     name: ${BACKSTAGE_SCAFFOLDER_NAME}
     email: ${BACKSTAGE_SCAFFOLDER_EMAIL}
+  defaultContext:
+    gitlab_hostname: ${GITLAB_HOSTNAME}
+    gitlab_user_name: ${GITLAB_USER_NAME}
 
 gitlab:
   allowedKinds:
@@ -127,7 +130,7 @@ catalog:
   locations:
     # AWS templates
     - type: url
-      target: https://${GITLAB_HOSTNAME}/opa-admin/backstage-reference/-/blob/main/templates/all-templates.yaml
+      target: https://${GITLAB_HOSTNAME}/${GITLAB_USER_NAME}/backstage-reference/-/blob/main/templates/all-templates.yaml
       rules:
         - allow: [Location, Template]
   providers:

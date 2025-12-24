@@ -150,7 +150,7 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
               - aws-environments
   steps:
@@ -160,6 +160,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower | replace(" ", "") }}
           title: ${{ parameters.name }}
           short_name: ${{ parameters.short_name | replace(" ", "") }}
