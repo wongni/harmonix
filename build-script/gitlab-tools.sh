@@ -11,15 +11,15 @@ configDir=${scriptDir}/../config
 
 source ${configDir}/.env
 
-GITLAB_TOKEN=$SECRET_GITLAB_CONFIG_PROP_apiToken
+GITLAB_API_TOKEN="${SECRET_GITLAB_CONFIG_PROP_apiToken}"
 
-if [[ -z "$GITLAB_TOKEN" ]]; then 
-  echo "Please set the API token before proceeding"
+if [[ -z "${GITLAB_API_TOKEN:-}" ]]; then 
+  echo "ERROR: GITLAB_API_TOKEN is not set. Please set it in your environment or .env file"
   exit 1
 fi
 
 # Try to create a new project if one doesn't exist (will fail through)
-curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }"
+curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_API_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }"
 
 # Take backup of Git configs if they are present
 if [ -f "$appDir/git-temp/backstage-reference/.git/config" ]; then
@@ -33,7 +33,7 @@ fi
 # Make tmp directory to add files that will be comitted to repo
 mkdir -p $appDir/git-temp
 echo -e "\nCloning from https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git\n"
-git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
+git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_API_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
 
 # Reinstate Git configs if available
 if [ -f "$appDir/git-config-temp" ]; then
@@ -97,6 +97,14 @@ if [ -n "$(git status --porcelain=v1 2>/dev/null)" ]; then
   max_retries=5
   # set a variable to track the sleep time between retries
   sleep_time=30
+  
+  # Update remote URL with current token before pushing
+  if [[ -z "${GITLAB_API_TOKEN:-}" ]]; then
+    echo "ERROR: GITLAB_API_TOKEN is not set"
+    exit 1
+  fi
+  git remote set-url origin "https://oauth2:$GITLAB_API_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
+  
   # Push to git.  If the command fails, retry up to 5 times with a sleep between retries
   while ! git push; do
     # uncomment the following code to print the git configuration for debugging purposes
