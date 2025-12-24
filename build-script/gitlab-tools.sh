@@ -18,8 +18,35 @@ if [[ -z "${GITLAB_API_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# Try to create a new project if one doesn't exist (will fail through)
-curl -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_API_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }"
+# Create GitLab groups if they don't exist (for GitLab SaaS)
+echo "Creating GitLab groups if they don't exist..."
+
+create_group() {
+  local group_path=$1
+  local group_name=$2
+  
+  # Check if group exists
+  GROUP_CHECK=$(curl -s -H "PRIVATE-TOKEN: $GITLAB_API_TOKEN" "https://$GITLAB_HOSTNAME/api/v4/groups/$group_path" | jq -r '.id // empty')
+  
+  if [[ -z "$GROUP_CHECK" ]]; then
+    echo "Creating group: $group_name"
+    curl -s -H "PRIVATE-TOKEN: $GITLAB_API_TOKEN" -H "Content-Type: application/json" \
+      "https://$GITLAB_HOSTNAME/api/v4/groups" \
+      -d "{\"path\": \"$group_path\", \"name\": \"$group_name\", \"visibility\": \"private\"}" > /dev/null
+  else
+    echo "Group $group_name already exists"
+  fi
+}
+
+create_group "aws-app" "aws-app"
+create_group "aws-environments" "aws-environments"
+create_group "aws-environment-providers" "aws-environment-providers"
+create_group "aws-resources" "aws-resources"
+
+echo ""
+
+# Try to create backstage-reference project under user namespace if one doesn't exist (will fail through)
+curl -s -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_API_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }" > /dev/null
 
 # Take backup of Git configs if they are present
 if [ -f "$appDir/git-temp/backstage-reference/.git/config" ]; then
@@ -60,10 +87,12 @@ cd $appDir/git-temp/backstage-reference;
 if [[ "$OSTYPE" == "darwin"* ]]; then
     find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
     find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
     find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 else
     find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
     find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
     find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 fi
 

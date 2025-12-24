@@ -186,7 +186,7 @@ spec:
             allowedHosts:
               - ${{ gitlab_hostname }}
             allowedOwners:
-              - ${{ gitlab_user_name }}
+              - ${{ gitlab_env_providers_group }}
   steps:
     - id: harmonixGetPlatformInfo
       name: Get Harmonix platform information

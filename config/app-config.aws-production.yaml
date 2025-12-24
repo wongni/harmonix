@@ -102,6 +102,7 @@ scaffolder:
   defaultContext:
     gitlab_hostname: ${GITLAB_HOSTNAME}
     gitlab_user_name: ${GITLAB_USER_NAME}
+    gitlab_env_providers_group: ${GITLAB_ENV_PROVIDERS_GROUP}
 
 gitlab:
   allowedKinds:
