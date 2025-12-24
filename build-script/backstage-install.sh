@@ -9,7 +9,7 @@
 # 
 # Set installMode to "from-source" to build/install Harmonix plugins from source
 # or set installMode to "npm" to install the latest published Harmonix NPM packages.
-installMode="npm"
+installMode="from-source"
 
 biScriptDir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 

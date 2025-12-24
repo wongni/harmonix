@@ -168,7 +168,7 @@ spec:
       action: publish:gitlab
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        repoVisibility: internal
+        repoVisibility: ${{ gitlab_project_visibility }}
         defaultBranch: main
     - id: register
       name: Register
