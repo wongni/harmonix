@@ -22,14 +22,23 @@ fi
 retry_count=0
 max_retries=30
 while [ $retry_count -lt $max_retries ]; do
-  response=$(curl -s -w "%{http_code}" -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"internal\" }")
+  response=$(curl -s -w "%{http_code}" -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }")
+  echo $response
   http_code=${response: -3}
+  response_body=${response:0:${#response}-3}
+  
   if [[ $http_code -eq 401 ]]; then
     retry_count=$((retry_count + 1))
     echo "401 error ($http_code), retrying... ($retry_count/$max_retries)"
     sleep 10
   elif [[ $http_code -eq 400 ]]; then
-    echo "Project already exists (400 error), proceeding with existing project"
+    if echo "$response_body" | grep -q "has already been taken"; then
+      echo "Project already exists (name/path taken), proceeding with existing project"
+    else
+      echo "ERROR: Failed to create project (400 error)"
+      echo "Response: $response_body"
+      exit 1
+    fi
     break
   else
     break

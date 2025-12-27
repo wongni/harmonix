@@ -180,15 +180,19 @@ export class OPAPlatformStack extends cdk.Stack {
 
     let backstageConstruct: BackstageFargateServiceConstruct | undefined;
 
-    const hostedZoneName = getEnvVarValue(process.env.R53_HOSTED_ZONE_NAME) || "";
-    if (!hostedZoneName) {
-      throw new Error("R53_HOSTED_ZONE_NAME variable must be set");
-    }
+    let hostedZone: HostedZoneConstruct | undefined;
+    
+    if (isFullPlatformProvisioningEnabled) {
+      const hostedZoneName = getEnvVarValue(process.env.R53_HOSTED_ZONE_NAME) || "";
+      if (!hostedZoneName) {
+        throw new Error("R53_HOSTED_ZONE_NAME variable must be set when FULL_PLATFORM_PROVISIONING_ENABLED is true");
+      }
 
-    const hostedZone = new HostedZoneConstruct(this, "hostedZoneMain", {
-      opaEnv: opaParams,
-      R53HostedZoneName: hostedZoneName,
-    });
+      hostedZone = new HostedZoneConstruct(this, "hostedZoneMain", {
+        opaEnv: opaParams,
+        R53HostedZoneName: hostedZoneName,
+      });
+    }
 
     // Create SSM Parameter to store the desired GitLab version
     const gitlabVersionParam = new ssm.StringParameter(this, `${opaParams.prefix}-gitlab-version`, {

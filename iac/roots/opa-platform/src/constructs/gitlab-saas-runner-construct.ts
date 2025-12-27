@@ -157,5 +157,16 @@ export class GitlabSaasRunnerConstruct extends Construct {
     new cdk.CfnOutput(this, `The OPA Platform Pipeline Role ARN Parameter`, {
       value: roleArnParam.parameterName,
     });
+
+    const roleParam = new ssm.StringParameter(this, `${props.opaEnv.prefix}-pipeline-role`, {
+      allowedPattern: ".*",
+      description: `The OPA Platform Pipeline Role Arn`,
+      parameterName: `/${props.opaEnv.prefix}/pipeline-role`,
+      stringValue: this.iamRole.roleArn,
+    });
+
+    new cdk.CfnOutput(this, `The OPA Platform Pipeline Role Arn Parameter`, {
+      value: roleParam.parameterName,
+    });
   }
 }
