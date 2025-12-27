@@ -137,7 +137,7 @@ spec:
       action: publish:gitlab
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        repoVisibility: internal
+        repoVisibility: ${{ gitlab_project_visibility }}
         defaultBranch: main
 
     # Create a new Gitlab repository access token for the newly created repo

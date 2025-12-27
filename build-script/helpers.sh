@@ -139,7 +139,6 @@ get_secret_value() {
 buildScriptDir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 backstageIacDir=$buildScriptDir/../iac/roots/opa-platform
 backstageDir=$buildScriptDir/../backstage
-GITLAB_USER_NAME=opa-admin
 GITLAB_GROUP_NAME=aws-app
 
 validate_bash_version

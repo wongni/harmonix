@@ -18,4 +18,4 @@ while [ $retry_count -lt $max_retries ]; do
     fi
 done
 
-sed -i.bak "s/^\(SECRET_GITLAB_CONFIG_PROP_apiToken=\).*$/\1\"$GITLAB_API_TOKEN\"/g" ./config/.env && rm -f ./config/.env.bak
+sed -i.bak "s/^\(SECRET_GITLAB_CONFIG_PROP_apiToken=\).*$/\1$GITLAB_API_TOKEN/g" ./config/.env && rm -f ./config/.env.bak

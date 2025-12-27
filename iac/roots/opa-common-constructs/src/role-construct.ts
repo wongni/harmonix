@@ -14,9 +14,10 @@ import { OPAEnvironmentParams } from "./opa-environment-params";
 export interface RoleConstructProps extends cdk.StackProps {
   readonly opaEnv: OPAEnvironmentParams;
   KMSkey: kms.IKey;
-  vpcCollection: ec2.Vpc[];
+  vpcCollection: ec2.IVpc[];
   ecsCollection: ecs.ICluster[];
   rootRoleArn?: string;
+  gitlabRunnerRoleArn?: string;
 }
 
 const defaultProps: Partial<RoleConstructProps> = {};
@@ -33,14 +34,16 @@ export class RoleConstruct extends Construct {
     const envIdentifier = `${props.opaEnv.prefix.toLowerCase()}-${props.opaEnv.envName}`;
     const envPathIdentifier = `/${props.opaEnv.prefix.toLowerCase()}/${props.opaEnv.envName.toLowerCase()}`;
 
+    const principals: iam.IPrincipal[] = [
+      new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+    ];
+    
+    if (props.gitlabRunnerRoleArn) {
+      principals.push(new iam.ArnPrincipal(props.gitlabRunnerRoleArn));
+    }
+
     this.IAMRole = new iam.Role(this, `${envIdentifier}-role`, {
-      // allow the role to be assumed by other roles
-      assumedBy: new iam.CompositePrincipal(
-        new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
-        // new iam.ArnPrincipal(`arn:aws:iam::${props.config.Account}:role/${props.rootRole}`)
-        new iam.ArnPrincipal(props.rootRoleArn ? props.rootRoleArn : "")
-      ),
-      // : new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+      assumedBy: new iam.CompositePrincipal(...principals),
       roleName: name,
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEC2ContainerRegistryFullAccess"),

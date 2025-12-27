@@ -14,7 +14,7 @@ export interface OPARootRoleConstructProps extends cdk.StackProps {
   readonly opaEnv: OPAEnvironmentParams;
   readonly securityTableName: string;
   KMSkey: kms.IKey;
-  network: NetworkConstruct;
+  network?: NetworkConstruct;
 }
 
 const defaultProps: Partial<OPARootRoleConstructProps> = {};
@@ -50,7 +50,9 @@ export class OPARootRoleConstruct extends Construct {
     this.IAMRole.addToPolicy(this.createCloudformationStatement());
     this.IAMRole.addToPolicy(this.createTagStatement());
     this.IAMRole.addToPolicy(this.createKmsStatement());
-    this.IAMRole.addToPolicy(this.createEc2Statement());
+    if (this.props.network) {
+      this.IAMRole.addToPolicy(this.createEc2Statement());
+    }
     this.IAMRole.addToPolicy(this.createDyamodbStatement());
 
     NagSuppressions.addResourceSuppressions(
@@ -193,7 +195,7 @@ export class OPARootRoleConstruct extends Construct {
     return new iam.PolicyStatement({
       actions: ["ec2:*"],
       effect: iam.Effect.ALLOW,
-      resources: [`arn:aws:ec2:*:${this.props.opaEnv.awsAccount}:vpc/${this.props.network.vpc.vpcId}`],
+      resources: [`arn:aws:ec2:*:${this.props.opaEnv.awsAccount}:vpc/${this.props.network!.vpc.vpcId}`],
     });
   }
 

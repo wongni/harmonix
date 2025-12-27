@@ -123,9 +123,9 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
-              - aws-environment-providers
+              - ${{ gitlab_env_providers_group }}
   steps:
     - id: harmonixGetPlatformInfo
       name: Get Harmonix platform information
@@ -144,6 +144,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower | replace(" ", "") }}
           title: ${{ parameters.name }}
           description: ${{ parameters.env_description }}
@@ -161,13 +162,13 @@ spec:
       action: fetch:plain
       input:
         targetPath: ./.iac
-        url: "https://{{gitlab_hostname}}/opa-admin/backstage-reference/-/tree/main/environments"
+        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments"
     - id: publish
       name: Publish
       action: publish:gitlab
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        repoVisibility: internal
+        repoVisibility: ${{ gitlab_project_visibility }}
         defaultBranch: main
     - id: register
       name: Register

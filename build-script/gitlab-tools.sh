@@ -11,10 +11,10 @@ configDir=${scriptDir}/../config
 
 source ${configDir}/.env
 
-GITLAB_TOKEN=$SECRET_GITLAB_CONFIG_PROP_apiToken
+GITLAB_TOKEN="${SECRET_GITLAB_CONFIG_PROP_apiToken}"
 
-if [[ -z "$GITLAB_TOKEN" ]]; then 
-  echo "Please set the API token before proceeding"
+if [[ -z "${GITLAB_TOKEN:-}" ]]; then 
+  echo "ERROR: GITLAB_TOKEN is not set. Please set SECRET_GITLAB_CONFIG_PROP_apiToken in your .env file"
   exit 1
 fi
 
@@ -47,8 +47,8 @@ if [ -d "$appDir/git-temp" ]; then
 fi
 # Make tmp directory to add files that will be comitted to repo
 mkdir -p $appDir/git-temp
-echo -e "\nCloning from https://$GITLAB_HOSTNAME/opa-admin/backstage-reference.git\n"
-git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/opa-admin/backstage-reference.git"
+echo -e "\nCloning from https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git\n"
+git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
 
 # Reinstate Git configs if available
 if [ -f "$appDir/git-config-temp" ]; then
@@ -73,11 +73,21 @@ cd $appDir/git-temp/backstage-reference;
 
 # Replace variable placeholders with env specific information
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    find . -type f -name "*.yaml" -exec sed -i "" "s/{{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/{{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_env_group *}}/$GITLAB_ENV_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_app_group *}}/$GITLAB_APP_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_resource_group *}}/$GITLAB_RESOURCE_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 else
-    find . -type f -name "*.yaml" -exec sed -i "s/{{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/{{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_env_group *}}/$GITLAB_ENV_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_app_group *}}/$GITLAB_APP_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_resource_group *}}/$GITLAB_RESOURCE_GROUP/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
 fi
 
 echo "Checking for git-defender"
@@ -91,7 +101,7 @@ if [[ ! -z "$IS_DEFENDER" ]] && ! grep -q "\[defender\]" .git/config ; then
   echo -e "\nGit Defender detected. Populating git-temp/.git/config for Defender.\n"
   echo -e "" >> .git/config
   echo -e "[defender]" >> .git/config
-  echo -e "\tallowrepo = https://$GITLAB_HOSTNAME/opa-admin/backstage-reference.git" >> .git/config
+  echo -e "\tallowrepo = https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git" >> .git/config
   echo -e "\tallowemail = $(whoami)@amazon.com" >> .git/config
   echo -e "\tregistered = true" >> .git/config
   echo -e "" >> .git/config
@@ -112,6 +122,14 @@ if [ -n "$(git status --porcelain=v1 2>/dev/null)" ]; then
   max_retries=5
   # set a variable to track the sleep time between retries
   sleep_time=30
+  
+  # Update remote URL with current token before pushing
+  if [[ -z "${GITLAB_TOKEN:-}" ]]; then
+    echo "ERROR: GITLAB_TOKEN is not set"
+    exit 1
+  fi
+  git remote set-url origin "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
+  
   # Push to git.  If the command fails, retry up to 5 times with a sleep between retries
   while ! git push; do
     # uncomment the following code to print the git configuration for debugging purposes

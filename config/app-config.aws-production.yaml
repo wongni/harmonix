@@ -99,6 +99,14 @@ scaffolder:
   defaultAuthor:
     name: ${BACKSTAGE_SCAFFOLDER_NAME}
     email: ${BACKSTAGE_SCAFFOLDER_EMAIL}
+  defaultContext:
+    gitlab_hostname: ${GITLAB_HOSTNAME}
+    gitlab_user_name: ${GITLAB_USER_NAME}
+    gitlab_env_providers_group: ${GITLAB_ENV_PROVIDERS_GROUP}
+    gitlab_env_group: ${GITLAB_ENV_GROUP}
+    gitlab_app_group: ${GITLAB_APP_GROUP}
+    gitlab_resource_group: ${GITLAB_RESOURCE_GROUP}
+    gitlab_project_visibility: ${GITLAB_PROJECT_VISIBILITY}
 
 gitlab:
   allowedKinds:
@@ -127,7 +135,7 @@ catalog:
   locations:
     # AWS templates
     - type: url
-      target: https://${GITLAB_HOSTNAME}/opa-admin/backstage-reference/-/blob/main/templates/all-templates.yaml
+      target: https://${GITLAB_HOSTNAME}/${GITLAB_USER_NAME}/backstage-reference/-/blob/main/templates/all-templates.yaml
       rules:
         - allow: [Location, Template]
   providers:

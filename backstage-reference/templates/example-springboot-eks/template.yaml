@@ -103,9 +103,9 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
-              - aws-app
+              - ${{ gitlab_app_group }}
 
   # These steps are executed in the scaffolder backend, using data that we gathered
   # via the parameters above.
@@ -161,9 +161,10 @@ spec:
       name: Fetch EKS Infrastructure as Code
       action: fetch:template
       input: 
-        url: https://{{ gitlab_hostname }}/opa-admin/backstage-reference/-/tree/main/common/aws_eks
+        url: https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_eks
         targetPath: ./.iac
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           component_id: ${{ parameters.component_id | lower }}
           appEnvPlaintext: ""
 
@@ -173,6 +174,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           appPort: "8080"
           component_id: ${{ parameters.component_id | lower | replace(" ", "") }}
           title: ${{ parameters.component_id }}
@@ -206,7 +208,7 @@ spec:
       action: publish:gitlab
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        repoVisibility: internal
+        repoVisibility: ${{ gitlab_project_visibility }}
         defaultBranch: main
 
     # Create a gitlab repository access token and store it in a SecretsManager secret    

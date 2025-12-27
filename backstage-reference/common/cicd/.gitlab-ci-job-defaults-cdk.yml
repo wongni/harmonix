@@ -1,6 +1,9 @@
 default:
   image:
     name: node:22
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
   before_script:
     - echo -e "\e[0Ksection_start:`date +%s`:log_os[collapsed=true]\r\e[0KOS Info"
     - cat /etc/os-release
@@ -23,11 +26,28 @@ default:
     - aws --version
     - echo -e "\e[0Ksection_end:`date +%s`:get_aws_cli\r\e[0K"
 
-    - echo -e "\e[0Ksection_start:`date +%s`:reset_aws_identity[collapsed=true]\r\e[0KReset AWS Caller Identity"
-    # Unset AWS_xxx env vars so that we will use the default EC2 instance role
-    - unset AWS_ACCESS_KEY_ID && unset AWS_SECRET_ACCESS_KEY && unset AWS_SESSION_TOKEN
+    - echo -e "\e[0Ksection_start:`date +%s`:setup_aws_identity[collapsed=true]\r\e[0KSetup AWS Caller Identity"
+    - |
+      if [ "$CI_SERVER_HOST" = "gitlab.com" ]; then
+        # Use OIDC for gitlab.com
+        export AWS_ROLE_ARN="${AWS_ROLE_ARN:-arn:aws:iam::988296651287:role/GitlabRunner-ConstructRole}"
+        export AWS_DEFAULT_REGION="${OPA_PLATFORM_REGION:-us-east-1}"
+        STS_OUTPUT=$(aws sts assume-role-with-web-identity \
+          --role-arn ${AWS_ROLE_ARN} \
+          --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}" \
+          --web-identity-token ${GITLAB_OIDC_TOKEN} \
+          --duration-seconds 3600 \
+          --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+          --output text)
+        export AWS_ACCESS_KEY_ID=$(echo $STS_OUTPUT | awk '{print $1}')
+        export AWS_SECRET_ACCESS_KEY=$(echo $STS_OUTPUT | awk '{print $2}')
+        export AWS_SESSION_TOKEN=$(echo $STS_OUTPUT | awk '{print $3}')
+      else
+        # Use EC2 instance role for self-hosted GitLab
+        unset AWS_ACCESS_KEY_ID && unset AWS_SECRET_ACCESS_KEY && unset AWS_SESSION_TOKEN
+      fi
     - aws sts get-caller-identity
-    - echo -e "\e[0Ksection_end:`date +%s`:reset_aws_identity\r\e[0K"
+    - echo -e "\e[0Ksection_end:`date +%s`:setup_aws_identity\r\e[0K"
 
     - echo -e "\e[0Ksection_start:`date +%s`:gitlab_access[collapsed=true]\r\e[0KConfigure GitLab Access"
     # Storing gitlab access token before changing role
@@ -40,7 +60,7 @@ default:
     # Clone reference repo so that apps can utilize shared files. This allows us to have
     # a single point of change for reusable files, instead of having to change them in
     # every application repository.
-    - git clone https://oauth2:$ACCESS_TOKEN@$CI_SERVER_HOST/opa-admin/backstage-reference.git
+    - git clone https://oauth2:$ACCESS_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_NAMESPACE/backstage-reference.git
     - mv $CI_PROJECT_DIR/backstage-reference/common/cicd $CI_PROJECT_DIR/
     - rm -rf $CI_PROJECT_DIR/backstage-reference
     - echo "Shared files are available in $CI_PROJECT_DIR/cicd"

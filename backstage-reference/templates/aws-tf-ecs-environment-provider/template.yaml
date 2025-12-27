@@ -189,6 +189,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower | replace(" ", "") }}
           albName: ${{ parameters.albName }}
           title: ${{ parameters.name }}
@@ -225,6 +226,7 @@ spec:
         targetPath: ./.iac
         url: "https://github.com/aws-fsi-pace/opaadmin_backstage-reference/blob/main/environments/opa-ecs-environment/terraform"
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower }}
 
     # pull common Terraform modules to local temp workspace

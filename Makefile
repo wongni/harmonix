@@ -10,13 +10,15 @@ LOGFILE := $(shell date +'install_%Y%m%d-%H%M.log')
 
 ##@ Local Tasks
 
-install: verify-env
+.PHONY: install-common
+install-common:
 	@echo -e "\nStarting with 'clean' to remove any previously installed local dependencies\n====================" 2>&1 | tee -a $(LOGFILE)
 	@$(MAKE) clean 2>&1 | tee -a $(LOGFILE)
 	@echo -e "\nStarting the Backstage installation\n====================" 2>&1 | tee -a $(LOGFILE)
 	@$(MAKE) backstage-install 2>&1 | tee -a $(LOGFILE)
-	@echo -e "\nBootstrapping CDK\n====================" 2>&1 | tee -a $(LOGFILE)
-	@$(MAKE) cdk-bootstrap 2>&1 | tee -a $(LOGFILE)
+
+.PHONY: install-platform
+install-platform:
 	@echo -e "\nSetting Secrets\n====================" 2>&1 | tee -a $(LOGFILE)
 	@$(MAKE) set-secrets 2>&1 | tee -a $(LOGFILE)
 	@echo -e "\nDeploying the OPA platform\n====================" 2>&1 | tee -a $(LOGFILE)
@@ -27,11 +29,24 @@ install: verify-env
 	@$(MAKE) push-backstage-reference-repo 2>&1 | tee -a $(LOGFILE)
 	@echo -e "\nBuilding the backstage image\n====================" 2>&1 | tee -a $(LOGFILE)
 	@$(MAKE) build-backstage 2>&1 | tee -a $(LOGFILE)
+
+install: verify-env
+	@$(MAKE) install-common 2>&1 | tee -a $(LOGFILE)
+	@echo -e "\nBootstrapping CDK\n====================" 2>&1 | tee -a $(LOGFILE)
+	@$(MAKE) cdk-bootstrap 2>&1 | tee -a $(LOGFILE)
+	@$(MAKE) install-platform 2>&1 | tee -a $(LOGFILE)
 	@echo -e "\nDeploying the backstage image\n====================" 2>&1 | tee -a $(LOGFILE)
 	@$(MAKE) deploy-backstage 2>&1 | tee -a $(LOGFILE)
 	@echo -e "\n\n" 2>&1 | tee -a $(LOGFILE)
 	@echo -e "Installation complete and the application is starting!" 2>&1 | tee -a $(LOGFILE)
 	@echo -e "Visit the application at https://${R53_HOSTED_ZONE_NAME}" 2>&1 | tee -a $(LOGFILE)
+
+install-local: verify-env
+	@$(MAKE) install-common 2>&1 | tee -a $(LOGFILE)
+	@$(MAKE) install-platform 2>&1 | tee -a $(LOGFILE)
+	@echo -e "\nStarting the local backstage application\n====================" 2>&1 | tee -a $(LOGFILE)
+	@$(MAKE) start-local-with-role 2>&1 | tee -a $(LOGFILE)
+	@echo -e "Visit the application at http://localhost:3000" 2>&1 | tee -a $(LOGFILE)
 
 verify-env:
 ifeq (,$(wildcard ./config/.env))

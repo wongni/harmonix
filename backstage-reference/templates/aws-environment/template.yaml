@@ -150,9 +150,9 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - {{ gitlab_hostname }}
+              - ${{ gitlab_hostname }}
             allowedOwners:
-              - aws-environments
+              - ${{ gitlab_env_group }}
   steps:
     - id: fetchBase
       name: Fetch Code Base
@@ -160,6 +160,7 @@ spec:
       input:
         url: ./content
         values:
+          gitlab_user_name: ${{ gitlab_user_name }}
           name: ${{ parameters.name | lower | replace(" ", "") }}
           title: ${{ parameters.name }}
           short_name: ${{ parameters.short_name | replace(" ", "") }}
@@ -180,7 +181,7 @@ spec:
       action: publish:gitlab
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        repoVisibility: internal
+        repoVisibility: ${{ gitlab_project_visibility }}
         defaultBranch: main
     - id: register
       name: Register

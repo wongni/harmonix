@@ -36,7 +36,7 @@ const defaultProps: Partial<GitlabRunnerConstructProps> = {};
  * Deploys the GitlabRunnerConstruct construct
  */
 export class GitlabRunnerConstruct extends Construct {
-  public gitlabEc2Role: iam.Role;
+  public iamRole: iam.Role;
   constructor(parent: Construct, name: string, props: GitlabRunnerConstructProps) {
     super(parent, name);
 
@@ -129,8 +129,24 @@ export class GitlabRunnerConstruct extends Construct {
       ],
     });
 
-     this.gitlabEc2Role = new iam.Role(this, "GitlabRunnerIamRole", {
-      assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
+     const gitlabOidcProvider = `arn:aws:iam::${props.opaEnv.awsAccount}:oidc-provider/gitlab.com`;
+     
+     this.iamRole = new iam.Role(this, "GitlabRunnerIamRole", {
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ServicePrincipal("ec2.amazonaws.com"),
+        new iam.FederatedPrincipal(
+          gitlabOidcProvider,
+          {
+            StringEquals: {
+              "gitlab.com:aud": "https://gitlab.com"
+            },
+            StringLike: {
+              "gitlab.com:sub": "project_path:*:ref_type:branch:ref:*"
+            }
+          },
+          "sts:AssumeRoleWithWebIdentity"
+        )
+      ),
       description: "Iam Role assumed by the Gitlab Runner",
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"),
@@ -139,7 +155,7 @@ export class GitlabRunnerConstruct extends Construct {
       inlinePolicies: { GitlabIamRolePolicy: gitlabIamRolePolicy },
     });
 
-    NagSuppressions.addResourceSuppressions(this.gitlabEc2Role, [
+    NagSuppressions.addResourceSuppressions(this.iamRole, [
       { id: "AwsSolutions-IAM4", reason: "Assumed roles will use AWS managed policies for demonstration purposes.  Customers will be advised/required to assess and apply custom policies based on their role requirements" },
       { id: "AwsSolutions-IAM5", reason: "Assumed roles will require permissions to perform multiple ecs, ddb, and ec2 for demonstration purposes.  Customers will be advised/required to assess and apply minimal permission based on role mappings to their idP groups" },
     ], true);
@@ -185,7 +201,7 @@ export class GitlabRunnerConstruct extends Construct {
       userData,
       securityGroup: instanceSecurityGroup,
       requireImdsv2: true,
-      role: this.gitlabEc2Role,
+      role: this.iamRole,
       machineImage,
       httpPutResponseHopLimit: 2,
       blockDevices: [blockDevice],
@@ -212,7 +228,7 @@ export class GitlabRunnerConstruct extends Construct {
       allowedPattern: ".*",
       description: `The OPA Platform Pipeline Role Arn`,
       parameterName: `/${props.opaEnv.prefix}/pipeline-role`,
-      stringValue: this.gitlabEc2Role.roleArn,
+      stringValue: this.iamRole.roleArn,
     });
 
     new cdk.CfnOutput(this, `The OPA Platform Pipeline Role Arn Parameter`, {

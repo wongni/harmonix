@@ -8,7 +8,8 @@ import {
   OPAEnvironmentParams,
   RdsConstruct,
   Wafv2BasicConstruct,
-  WafV2Scope
+  WafV2Scope,
+  RoleConstruct
 } from "@aws/aws-app-development-common-constructs";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
@@ -23,6 +24,7 @@ import { GitlabHostingConstruct } from "./constructs/gitlab-hosting-construct";
 import { GitlabRunnerConstruct } from "./constructs/gitlab-runner-construct";
 import { OPARootRoleConstruct } from "./constructs/opa-role-construct";
 import { ScmAndPipelineInfoConstruct } from "./constructs/scm-and-pipeline-info-construct";
+import { GitlabSaasRunnerConstruct } from "./constructs/gitlab-saas-runner-construct";
 
 import { NagSuppressions } from "cdk-nag";
 
@@ -63,6 +65,14 @@ export interface OPAPlatformStackProps extends cdk.StackProps {
 export class OPAPlatformStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: OPAPlatformStackProps) {
     super(scope, id, props);
+    
+    // Feature admission control
+    const isGitlabProvisioningEnabled =
+      Boolean(getEnvVarValue(
+        process.env.GITLAB_PROVISIONING_ENABLED)
+      ) || false;
+    const isFullPlatformProvisioningEnabled =
+      getEnvVarValue(process.env.FULL_PLATFORM_PROVISIONING_ENABLED)?.toLowerCase() !== "false";
 
     const sAllowedIPs = getEnvVarValue(process.env.ALLOWED_IPS);
     const allowedIPs = sAllowedIPs?.split(",").map((s) => {
@@ -100,47 +110,54 @@ export class OPAPlatformStack extends cdk.Stack {
     const scmAndPipelineInfoConstruct = new ScmAndPipelineInfoConstruct(this, `${opaParams.prefix}-git-info`, {
       opaEnv: opaParams,
       key,
-      gitlabHostName: getEnvVarValue(process.env.GITLAB_HOSTNAME),
-      gitlabUrl:`https://${getEnvVarValue(process.env.GITLAB_HOSTNAME)}`,
-      githubHostName: getEnvVarValue(process.env.GITHUB_HOSTNAME),
-      githubUrl: `https://${getEnvVarValue(process.env.GITHUB_HOSTNAME)}`
+      gitlabHostName: getEnvVarValue(process.env.GITLAB_HOSTNAME) || "gitlab.com",
+      gitlabUrl: `https://${getEnvVarValue(process.env.GITLAB_HOSTNAME)}` || "https://gitlab.com",
+      githubHostName: getEnvVarValue(process.env.GITHUB_HOSTNAME) || "github.com",
+      githubUrl: `https://${getEnvVarValue(process.env.GITHUB_HOSTNAME)}` || "https://github.com",
     });
     
-    // Create an ECR repository to contain backstage container images
-    const ecrRepository = new ecr.Repository(this, `${opaParams.prefix}-ecr-repository`, {
-      repositoryName: `${opaParams.prefix}-backstage`,
-      imageScanOnPush: true,
-      encryption: ecr.RepositoryEncryption.KMS,
-      encryptionKey: key,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      emptyOnDelete: true,
-    });
+    let ecrRepository: ecr.Repository | undefined;
+    let backstageECRParam: ssm.StringParameter | undefined;
+    let network: NetworkConstruct | undefined;
+    let rdsConstruct: RdsConstruct | undefined;
 
-    // Save ECR Repo in an SSM Parameter
-    const backstageECRParam = new ssm.StringParameter(this, `${opaParams.prefix}-backstage-ecr-param`, {
-      allowedPattern: ".*",
-      description: "The ECR Key for Backstage Solution",
-      parameterName: `/${opaParams.prefix}/backstage-ecr`,
-      stringValue: ecrRepository.repositoryName,
-    });
+    if (isFullPlatformProvisioningEnabled) {
+      // Create an ECR repository to contain backstage container images
+      ecrRepository = new ecr.Repository(this, `${opaParams.prefix}-ecr-repository`, {
+        repositoryName: `${opaParams.prefix}-backstage`,
+        imageScanOnPush: true,
+        encryption: ecr.RepositoryEncryption.KMS,
+        encryptionKey: key,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        emptyOnDelete: true,
+      });
 
-    // Create VPC for hosting backstage
-    const network = new NetworkConstruct(this, "Backstage-Network", {
-      opaEnv: opaParams,
-      cidrRange: getEnvVarValue(process.env.BACKSTAGE_NETWORK_CIDR_RANGE) || "10.0.0.0/16",
-      isIsolated: false,
-      allowedIPs,
-      publicVpcNatGatewayCount: +(getEnvVarValue(process.env.NUM_PUBLIC_NATGW) || 3),
-      vpcAzCount: +(getEnvVarValue(process.env.NUM_AZ) || 3),
-    });
+      // Save ECR Repo in an SSM Parameter
+      backstageECRParam = new ssm.StringParameter(this, `${opaParams.prefix}-backstage-ecr-param`, {
+        allowedPattern: ".*",
+        description: "The ECR Key for Backstage Solution",
+        parameterName: `/${opaParams.prefix}/backstage-ecr`,
+        stringValue: ecrRepository.repositoryName,
+      });
 
-    // Create DB for backstage platform
-    const rdsConstruct = new RdsConstruct(this, "rds-construct", {
-      opaEnv: opaParams,
-      vpc: network.vpc,
-      kmsKey: key,
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
-    });
+      // Create VPC for hosting backstage
+      network = new NetworkConstruct(this, "Backstage-Network", {
+        opaEnv: opaParams,
+        cidrRange: getEnvVarValue(process.env.BACKSTAGE_NETWORK_CIDR_RANGE) || "10.0.0.0/16",
+        isIsolated: false,
+        allowedIPs,
+        publicVpcNatGatewayCount: +(getEnvVarValue(process.env.NUM_PUBLIC_NATGW) || 3),
+        vpcAzCount: +(getEnvVarValue(process.env.NUM_AZ) || 3),
+      });
+
+      // Create DB for backstage platform
+      rdsConstruct = new RdsConstruct(this, "rds-construct", {
+        opaEnv: opaParams,
+        vpc: network.vpc,
+        kmsKey: key,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.R6G, ec2.InstanceSize.XLARGE),
+      });
+    }
 
     // Create Solution DynamoDB Tables - SecurityRoleMapping
     const securityMappingTableConstruct = new DynamoDBConstruct(this, "security-mapping-table", {
@@ -149,7 +166,7 @@ export class OPAPlatformStack extends cdk.Stack {
       kmsKey: key,
     });
 
-    // Create Master role
+    // Create Master role for Backstage (always created for local development)
     const backstageRootRole = new OPARootRoleConstruct(this, "backstage-master-role", {
       opaEnv: opaParams,
       securityTableName: securityMappingTableConstruct.table.tableName,
@@ -161,20 +178,17 @@ export class OPAPlatformStack extends cdk.Stack {
     const customerLogo = getEnvVarValue(process.env.CUSTOMER_LOGO) || "https://companieslogo.com/img/orig/AMZN_BIG-accd00da.png";
     const customerLogoIcon = getEnvVarValue(process.env.CUSTOMER_LOGO_ICON) || "https://companieslogo.com/img/orig/AMZN.D-13fddc58.png";
 
-    let gitlabHostingConstruct: GitlabHostingConstruct;
-    let hostedZone: HostedZoneConstruct;
-    let backstageConstruct: BackstageFargateServiceConstruct;
+    let backstageConstruct: BackstageFargateServiceConstruct | undefined;
 
     const hostedZoneName = getEnvVarValue(process.env.R53_HOSTED_ZONE_NAME) || "";
     if (!hostedZoneName) {
       throw new Error("R53_HOSTED_ZONE_NAME variable must be set");
     }
 
-    hostedZone = new HostedZoneConstruct(this, "hostedZoneMain", {
+    const hostedZone = new HostedZoneConstruct(this, "hostedZoneMain", {
       opaEnv: opaParams,
       R53HostedZoneName: hostedZoneName,
     });
-
 
     // Create SSM Parameter to store the desired GitLab version
     const gitlabVersionParam = new ssm.StringParameter(this, `${opaParams.prefix}-gitlab-version`, {
@@ -183,136 +197,183 @@ export class OPAPlatformStack extends cdk.Stack {
         parameterName: `/${opaParams.prefix}/gitlab-version`,
         stringValue: getEnvVarValue(process.env.GITLAB_VERSION) || "latest",
       });
-
-    // Create a secured EC2 Hosted Gitlab
-    gitlabHostingConstruct = new GitlabHostingConstruct(this, "GitlabHosting-Construct", {
-      opaEnv: opaParams,
-      network: network,
-      accessLogBucket: network.logBucket,
-      instanceDiskSize: 3000,
-      instanceSize: ec2.InstanceSize.XLARGE,
-      instanceClass: ec2.InstanceClass.C5,
-      hostedZone: hostedZone,
-      gitlabSecret,
-    });
-    gitlabHostingConstruct.node.addDependency(gitlabSecret);
-    gitlabHostingConstruct.node.addDependency(gitlabVersionParam);
-
-    const automationSecret = getEnvVarValue(process.env.CREATE_AUTOMATION_SECRET).toLowerCase() === "true"
-      ? createManagedSecret(
-          this,
-          `${opaParams.prefix}-automation-secret`,
-          `${opaParams.prefix}-${opaParams.envName}-automation-secret`,
-          key
-        )
-      : undefined;
-
-    const mcpTokenSecret = getEnvVarValue(process.env.CREATE_MCP_TOKEN_SECRET).toLowerCase() === "true"
-      ? createManagedSecret(
-          this,
-          `${opaParams.prefix}-mcp-token-secret`,
-          `${opaParams.prefix}-${opaParams.envName}-mcp-token-secret`,
-          key
-        )
-      : undefined;    
-
-    backstageConstruct = new BackstageFargateServiceConstruct(this, `${opaParams.prefix}-fargate-service`, {
-      network: network,
-      opaEnv: opaParams,
-      ecrRepository,
-      ecrKmsKey: key,
-      accessLogBucket: network.logBucket,
-      dbCluster: rdsConstruct.cluster,
-      oktaSecret,
-      gitlabAdminSecret: scmAndPipelineInfoConstruct.gitlabSecret,
-      githubAdminSecret: scmAndPipelineInfoConstruct.githubSecret,
-      taskRole: backstageRootRole.IAMRole,
-      gitlabHostname: scmAndPipelineInfoConstruct.gitlabHostNameParam?.stringValue || "",
-      githubHostname: scmAndPipelineInfoConstruct.githubHostNameParam?.stringValue || "",
-      hostedZone,
-      customerName,
-      customerLogo,
-      customerLogoIcon,
-      automationSecret,
-      mcpTokenSecret,
-    });
-
-    // Create EC2 Gitlab Runner
-    const gitlabRunner = new GitlabRunnerConstruct(this, "GitlabRunner-Construct", {
-      opaEnv: opaParams,
-      network,
-      runnerSg: gitlabHostingConstruct.gitlabRunnerSecurityGroup,
-      gitlabSecret,
-      instanceDiskSize: 3000,
-      instanceSize: ec2.InstanceSize.XLARGE,
-      instanceClass: ec2.InstanceClass.C5,
-    });
-    // wait till gitlab host is done.
-    gitlabRunner.node.addDependency(gitlabHostingConstruct);
-
-   
-
-    // Attach the AdministratorAccess policy to the role if required
     
-    const createEnvRole = getEnvVarValue(process.env.CREATE_ENV_PROVISIONING_ROLE);
-    if (createEnvRole.toLowerCase() === 'true'){
-
-      // create the environment provisioning role.
-      const envProvisioningRole = new iam.Role(this, "EnvProvisioningRole", {
-        assumedBy: new iam.CompositePrincipal(
-          new iam.ArnPrincipal(backstageRootRole.IAMRole.roleArn),
-          new iam.ArnPrincipal(gitlabRunner.gitlabEc2Role.roleArn)
-        ),
-        roleName: "opa-envprovisioning-role", // Optional: specify a role name
-      });
-      
-      //TODO: Reduce permissions before release to PROD
-      envProvisioningRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("AdministratorAccess"));
-
-      NagSuppressions.addResourceSuppressions(envProvisioningRole, [
-        {
-          id: "AwsSolutions-IAM4",
-          reason:
-            "The power access policy is intentionally designed to grant full administrative access to AWS services for specific administrative roles. This use case has been reviewed and accepted by our security team.",
+    let gitlabHostingConstruct: GitlabHostingConstruct | undefined;
+    let gitlabRunner: GitlabRunnerConstruct;
+    if (isGitlabProvisioningEnabled && network) {
+      // Create a secured EC2 Hosted Gitlab
+      gitlabHostingConstruct = new GitlabHostingConstruct(this, "GitlabHosting-Construct", {
+          opaEnv: opaParams,
+          network,
+          accessLogBucket: network.logBucket,
+          instanceDiskSize: 3000,
+          instanceSize: ec2.InstanceSize.XLARGE,
+          instanceClass: ec2.InstanceClass.C5,
+          hostedZone: hostedZone,
+          gitlabSecret,
         },
-      ]);
+      );
+      gitlabHostingConstruct.node.addDependency(gitlabSecret);
+      gitlabHostingConstruct.node.addDependency(gitlabVersionParam);
+  
+      // Create EC2 Gitlab Runner
+      gitlabRunner = new GitlabRunnerConstruct(
+        this,
+        "GitlabRunner-Construct",
+        {
+          opaEnv: opaParams,
+          network,
+          runnerSg: gitlabHostingConstruct.gitlabRunnerSecurityGroup,
+          gitlabSecret,
+          instanceDiskSize: 3000,
+          instanceSize: ec2.InstanceSize.XLARGE,
+          instanceClass: ec2.InstanceClass.C5,
+        },
+      );
+      // wait till gitlab host is done.
+      gitlabRunner.node.addDependency(gitlabHostingConstruct);
+    } else {
+      // Gitlab SaaS Runner role based on idp
+      gitlabRunner = new GitlabSaasRunnerConstruct(
+        this,
+        "GitlabRunner-Construct",
+        {
+          opaEnv: opaParams,
+        },
+      );
+    }
 
-      // store the provisioning role arn to ssm
-      new ssm.StringParameter(this, `${opaParams.prefix}-provisioning-role`, {
-        allowedPattern: ".*",
-        description: "This role is assumed by platform to provision environments",
-        parameterName: `/${opaParams.prefix}/provisioning-role`,
-        stringValue: envProvisioningRole.roleArn,
-      });
+    const shouldCreateAutomationSecret: boolean = getEnvVarValue(process.env.CREATE_AUTOMATION_SECRET).toLocaleLowerCase() === "true";
+    let automationSecret: secretsmanager.Secret | undefined;    
+    if (shouldCreateAutomationSecret) {
+      automationSecret = createManagedSecret(
+        this,
+        `${opaParams.prefix}-automation-secret`,
+        `${opaParams.prefix}-${opaParams.envName}-automation-secret`,
+        key
+      );
+    }
 
-      new cdk.CfnOutput(this, `${opaParams.prefix}-envprovisioning-role-arn`, {
-        value: envProvisioningRole.roleArn,
-        description: "Role will be assumed to provision environments",
+    const shouldCreateMCPTokenSecret: boolean = getEnvVarValue(process.env.CREATE_MCP_TOKEN_SECRET).toLocaleLowerCase() === "true";
+    let mcpTokenSecret: secretsmanager.Secret | undefined;    
+    if (shouldCreateMCPTokenSecret) {
+      mcpTokenSecret = createManagedSecret(
+        this,
+        `${opaParams.prefix}-mcp-token-secret`,
+        `${opaParams.prefix}-${opaParams.envName}-mcp-token-secret`,
+        key
+      );
+    }
+
+    if (isFullPlatformProvisioningEnabled && network && ecrRepository && rdsConstruct) {
+      backstageConstruct = new BackstageFargateServiceConstruct(this, `${opaParams.prefix}-fargate-service`, {
+        network,
+        opaEnv: opaParams,
+        ecrRepository,
+        ecrKmsKey: key,
+        accessLogBucket: network.logBucket,
+        dbCluster: rdsConstruct.cluster,
+        oktaSecret,
+        gitlabAdminSecret: scmAndPipelineInfoConstruct.gitlabSecret,
+        githubAdminSecret: scmAndPipelineInfoConstruct.githubSecret,
+        taskRole: backstageRootRole.IAMRole,
+        gitlabHostname: scmAndPipelineInfoConstruct.gitlabHostNameParam?.stringValue || "",
+        githubHostname: scmAndPipelineInfoConstruct.githubHostNameParam?.stringValue || "",
+        hostedZone,
+        customerName,
+        customerLogo,
+        customerLogoIcon,
+        automationSecret,
+        mcpTokenSecret,
       });
     }
-    
-    // Create a regional WAF Web ACL for load balancers
-    const wafConstruct = new Wafv2BasicConstruct(this, `${opaParams.prefix}-regional-wafAcl`, {
-      wafScope: WafV2Scope.REGIONAL,
-      region: cdk.Stack.of(this).region,
-    });
 
-    // Associate the web ACL with load balancers
-    wafConstruct.addResourceAssociation(
-      `${opaParams.prefix}-backstage-alb-backstage-webacl-assoc`,
-      backstageConstruct.loadBalancer.loadBalancerArn
+    // Create environment provisioning role - always needed for environment provisioning
+    const principals: iam.IPrincipal[] = [
+      new iam.ArnPrincipal(backstageRootRole.IAMRole.roleArn),
+      new iam.ArnPrincipal(gitlabRunner.iamRole.roleArn),
+    ];
+
+    // Add OIDC principal if using GitLab SaaS
+    if (gitlabRunner instanceof GitlabSaasRunnerConstruct) {
+      principals.push(
+        new iam.OpenIdConnectPrincipal(gitlabRunner.iamOidcProvider, {
+          StringEquals: {
+            "gitlab.com:aud": "https://gitlab.com",
+          },
+          StringLike: {
+            "gitlab.com:sub": "project_path:*:ref_type:branch:ref:*",
+          },
+        })
+      );
+    }
+    
+    const envProvisioningRole = new iam.Role(this, "EnvProvisioningRole", {
+        assumedBy: new iam.CompositePrincipal(...principals),
+        roleName: `${opaParams.prefix}-envprovisioning-role`,
+      },
     );
 
-    wafConstruct.addResourceAssociation(
-      `${opaParams.prefix}-gitlab-alb-git-webacl-assoc`,
-      gitlabHostingConstruct.alb.loadBalancerArn
+    //TODO: Reduce permissions before release to PROD
+    envProvisioningRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AdministratorAccess"),
     );
 
-    new cdk.CfnOutput(this, `${opaParams.prefix}-ecr-output`, {
-      value: backstageECRParam.parameterName,
-      description: "ECR repository for backstage platform images",
+    NagSuppressions.addResourceSuppressions(envProvisioningRole, [
+      {
+        id: "AwsSolutions-IAM4",
+        reason:
+          "The power access policy is intentionally designed to grant full administrative access to AWS services for specific administrative roles. This use case has been reviewed and accepted by our security team.",
+      },
+    ]);
+
+    // store the provisioning role arn to ssm
+    new ssm.StringParameter(this, `${opaParams.prefix}-provisioning-role`, {
+      allowedPattern: ".*",
+      description: "This role is assumed by platform to provision environments",
+      parameterName: `/${opaParams.prefix}/provisioning-role`,
+      stringValue: envProvisioningRole.roleName,
     });
 
+    new ssm.StringParameter(this, `${opaParams.prefix}-envprovisioning-role-arn`, {
+      allowedPattern: ".*",
+      description:
+        "ARN of the role assumed by platform to provision environments",
+        parameterName: `/${opaParams.prefix}/provisioning-role-arn`,
+      stringValue: envProvisioningRole.roleArn,
+    });
+
+    new cdk.CfnOutput(this, `${opaParams.prefix}-envprovisioning-role-arn-output`, {
+      value: envProvisioningRole.roleArn,
+      description: "Role will be assumed to provision environments",
+    });
     
+    if (isFullPlatformProvisioningEnabled && backstageConstruct) {
+      // Create a regional WAF Web ACL for load balancers
+      const wafConstruct = new Wafv2BasicConstruct(this, `${opaParams.prefix}-regional-wafAcl`, {
+        wafScope: WafV2Scope.REGIONAL,
+        region: cdk.Stack.of(this).region,
+      });
+
+      // Associate the web ACL with load balancers
+      wafConstruct.addResourceAssociation(
+        `${opaParams.prefix}-backstage-alb-backstage-webacl-assoc`,
+        backstageConstruct.loadBalancer.loadBalancerArn
+      );
+      
+      if(isGitlabProvisioningEnabled && gitlabHostingConstruct) { 
+        wafConstruct.addResourceAssociation(
+          `${opaParams.prefix}-gitlab-alb-git-webacl-assoc`,
+          gitlabHostingConstruct.alb.loadBalancerArn
+        );
+      }
+    }
+
+    if (backstageECRParam) {
+      new cdk.CfnOutput(this, `${opaParams.prefix}-ecr-output`, {
+        value: backstageECRParam.parameterName,
+        description: "ECR repository for backstage platform images",
+      });
+    }
   }
 }

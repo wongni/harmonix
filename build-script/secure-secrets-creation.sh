@@ -72,7 +72,7 @@ if [[ ! -z "$GITLAB_SECRET_NAME" ]]; then
     else
         echo -e "\nCreating/Updating GitLab $GITLAB_SECRET_NAME secret...\n"
 
-        echo "{\"username\": \"opa-admin\", \"apiToken\": \"\", \"password\": \"\", \"runnerRegistrationToken\": \"\", \"runnerId\": \"\"}" > $scriptDir/tempSecretToCreate.json
+        echo "{\"username\": \"$GITLAB_USER_NAME\", \"apiToken\": \"$SECRET_GITLAB_CONFIG_PROP_apiToken\", \"password\": \"\", \"runnerRegistrationToken\": \"\", \"runnerId\": \"\"}" > $scriptDir/tempSecretToCreate.json
 
         if cmdOutput=$(aws secretsmanager describe-secret --secret-id $GITLAB_SECRET_NAME 2> /dev/null); then
             echo "Updating existing secret:"
