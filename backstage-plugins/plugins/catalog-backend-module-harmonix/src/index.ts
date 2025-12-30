@@ -12,3 +12,5 @@ export { AWSEnvironmentEntitiesProcessor } from './processor/AWSEnvironmentEntit
 
 export { AWSEnvironmentProviderEntitiesProcessor } from './processor/AWSEnvironmentProviderEntitiesProcessor';
 
+export { createListCatalogEntitiesAction } from './actions/createListCatalogEntitiesAction';
+

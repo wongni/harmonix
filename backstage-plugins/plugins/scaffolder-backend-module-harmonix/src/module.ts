@@ -1,4 +1,5 @@
 import { coreServices, createBackendModule } from "@backstage/backend-plugin-api";
+import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { createExampleAction } from "./actions/example";
 import { ScmIntegrations } from '@backstage/integration';
@@ -14,6 +15,11 @@ import {
   getPlatformParametersAction,
   getSsmParametersAction
 } from "./actions";
+import { createCreateScaffolderTaskAction } from './actions/createCreateScaffolderTaskAction';
+import { createGetScaffolderTaskAction } from './actions/createGetScaffolderTaskAction';
+import { createCancelScaffolderTaskAction } from './actions/createCancelScaffolderTaskAction';
+import { createRetryScaffolderTaskAction } from './actions/createRetryScaffolderTaskAction';
+import { createGetScaffolderTaskEventsAction } from './actions/createGetScaffolderTaskEventsAction';
 
 /** 
  * A backend module that registers the action into the scaffolder
@@ -26,9 +32,11 @@ export const scaffolderModule = createBackendModule({
       deps: {
         scaffolderActions: scaffolderActionsExtensionPoint,
         config: coreServices.rootConfig,
-        discovery: coreServices.discovery
+        discovery: coreServices.discovery,
+        actionsRegistry: actionsRegistryServiceRef,
+        auth: coreServices.auth,
       },
-      async init({ scaffolderActions, config, discovery }) {
+      async init({ scaffolderActions, config, discovery, actionsRegistry, auth }) {
         const integrations = ScmIntegrations.fromConfig(config);
         const catalogClient = new CatalogClient({
           discoveryApi: discovery,
@@ -43,6 +51,36 @@ export const scaffolderModule = createBackendModule({
         scaffolderActions.addActions(getPlatformParametersAction({ envConfig: config }))
         scaffolderActions.addActions(createRepoAccessTokenAction({ integrations, envConfig: config }));
         scaffolderActions.addActions(createExampleAction());
+
+        createCreateScaffolderTaskAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createGetScaffolderTaskAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createCancelScaffolderTaskAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createRetryScaffolderTaskAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createGetScaffolderTaskEventsAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
       }
     });
   },

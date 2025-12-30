@@ -478,19 +478,17 @@ export class AppsPlatformService implements IAppsPlatformService{
 
     const result = await this.git.gitProviderImpl.commitContent(change, repo, gitToken);
     console.log(result)
-    let resultBody = result.message
-    
-
+    const resultBody = typeof result.message === 'string' ? result.message : JSON.stringify(result.message);
     
     if (!result.isSuccuess) {
       console.error(
         `ERROR: Failed to Update provider ${provider.name}. Response: ${result}`,
       );
       let message = '';
-      if (resultBody.message?.includes('A file with this name already exists')) {
+      if (resultBody.includes('A file with this name already exists')) {
         message = `Update ${provider.name} has already been scheduled. Check the CICD pipeline for the most up-to-date information. UI status may take a few minutes to update.`;
       } else {
-        message = resultBody.message || '';
+        message = resultBody;
       }
       return { status: 'FAILURE', message };
     } else {
