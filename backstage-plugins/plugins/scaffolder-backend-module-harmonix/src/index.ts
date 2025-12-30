@@ -12,3 +12,5 @@ export { createGetScaffolderTaskAction } from './actions/createGetScaffolderTask
 export { createCancelScaffolderTaskAction } from './actions/createCancelScaffolderTaskAction';
 export { createRetryScaffolderTaskAction } from './actions/createRetryScaffolderTaskAction';
 export { createGetScaffolderTaskEventsAction } from './actions/createGetScaffolderTaskEventsAction';
+export { createGetGitlabPipelinesAction } from './actions/createGetGitlabPipelinesAction';
+export { createGetGitlabProjectAction } from './actions/createGetGitlabProjectAction';

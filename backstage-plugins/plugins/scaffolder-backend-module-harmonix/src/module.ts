@@ -20,6 +20,8 @@ import { createGetScaffolderTaskAction } from './actions/createGetScaffolderTask
 import { createCancelScaffolderTaskAction } from './actions/createCancelScaffolderTaskAction';
 import { createRetryScaffolderTaskAction } from './actions/createRetryScaffolderTaskAction';
 import { createGetScaffolderTaskEventsAction } from './actions/createGetScaffolderTaskEventsAction';
+import { createGetGitlabPipelinesAction } from './actions/createGetGitlabPipelinesAction';
+import { createGetGitlabProjectAction } from './actions/createGetGitlabProjectAction';
 
 /** 
  * A backend module that registers the action into the scaffolder
@@ -77,6 +79,18 @@ export const scaffolderModule = createBackendModule({
         });
 
         createGetScaffolderTaskEventsAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createGetGitlabPipelinesAction({
+          discovery,
+          auth,
+          actionsRegistry,
+        });
+
+        createGetGitlabProjectAction({
           discovery,
           auth,
           actionsRegistry,
