@@ -46,7 +46,7 @@ export const scaffolderModule = createBackendModule({
 
         scaffolderActions.addActions(createWriteFileAction())
         scaffolderActions.addActions(createSecretAction({ envConfig: config }))
-        scaffolderActions.addActions(getEnvProvidersAction({ catalogClient }))
+        scaffolderActions.addActions(getEnvProvidersAction({ catalogClient, auth }))
         scaffolderActions.addActions(getComponentInfoAction())
         scaffolderActions.addActions(getSsmParametersAction())
         scaffolderActions.addActions(getPlatformMetadataAction({ envConfig: config }))

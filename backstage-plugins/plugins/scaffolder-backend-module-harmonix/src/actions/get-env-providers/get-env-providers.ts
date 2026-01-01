@@ -4,6 +4,7 @@
 import { CatalogApi } from '@backstage/catalog-client';
 import { Entity, EntityRelation, RELATION_DEPENDS_ON } from '@backstage/catalog-model';
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { AuthService } from '@backstage/backend-plugin-api';
 import yaml from 'yaml';
 import { getAWScreds } from '@aws/plugin-aws-apps-backend-for-backstage';
 import { getSSMParameterValue } from '../../helpers/action-context';
@@ -46,8 +47,8 @@ interface DeploymentParameters {
   kubectlLambdaRoleArn?: string;
 }
 
-export function getEnvProvidersAction(options: { catalogClient: CatalogApi }) {
-  const { catalogClient } = options;
+export function getEnvProvidersAction(options: { catalogClient: CatalogApi; auth: AuthService }) {
+  const { catalogClient, auth } = options;
 
   return createTemplateAction({
     id: ID,
@@ -86,7 +87,22 @@ export function getEnvProvidersAction(options: { catalogClient: CatalogApi }) {
     handler: async ctx => {
 
       const { environmentRef } = ctx.input;
-      const token = ctx.secrets?.backstageToken;
+      
+      let token: string;
+      
+      // Use plugin token for service-to-service auth when no user context
+      if (ctx.user?.entity === undefined) {
+        ctx.logger.debug(`No user context found, using plugin token for catalog access`);
+        const pluginToken = await auth.getPluginRequestToken({
+          onBehalfOf: await ctx.getInitiatorCredentials(),
+          targetPluginId: 'catalog',
+        });
+        token = pluginToken.token;
+        ctx.logger.debug(`Plugin token obtained for catalog access`);
+      } else {
+        ctx.logger.debug(`User context exists, using backstage token from context`);
+        token = ctx.secrets?.backstageToken!;
+      }
 
       ctx.logger.info(`environmentRef: ${environmentRef}`);
 
