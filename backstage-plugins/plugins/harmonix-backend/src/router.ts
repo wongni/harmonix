@@ -376,7 +376,7 @@ export async function createRouter(options: RouterOptions): Promise<express.Rout
     logger.info(`fetching environment entity file path is ${filePath}`);
     // get the JSON file from the repo
     const jsonResponse = await apiPlatformClient.getFileContentsFromGit(repoInfo, filePath, secretName);
-    const configJson = JSON.parse(atob(jsonResponse))
+    const configJson = JSON.parse(jsonResponse)
     res.status(200).json(configJson);
   });
 
