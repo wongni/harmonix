@@ -1,5 +1,8 @@
 iac-deployment-env-provider:
   stage: build
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
   before_script:
     - echo -e "\e[0Ksection_start:`date +%s`:log_os[collapsed=true]\r\e[0KOS Info"
     - cat /etc/os-release
@@ -15,15 +18,34 @@ iac-deployment-env-provider:
     - aws --version
     - echo -e "\e[0Ksection_end:`date +%s`:get_tools\r\e[0K"
 
+    # Export environment variables
+    - set -a && source stack-parameters.properties && set +a
+
     - echo -e "\e[0Ksection_start:`date +%s`:aws_identity[collapsed=true]\r\e[0KAssume AWS IAM Role"
+    - echo "=== OIDC Token Debug ==="
+    - echo "CI_PROJECT_PATH=$CI_PROJECT_PATH"
+    - echo "CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
+    - echo "CI_COMMIT_REF_TYPE=$CI_COMMIT_REF_TYPE"
+    - echo "ROLE_ARN=$ROLE_ARN"
+    - PAYLOAD=$(echo $GITLAB_OIDC_TOKEN | cut -d'.' -f2 | tr '_-' '/+')
+    - echo "Decoded JWT claims:" && echo $PAYLOAD | base64 -d 2>/dev/null | jq . || echo "Failed to decode"
+    - echo "Expected - aud:https://gitlab.com sub:project_path:*:ref_type:branch:ref:*"
+    - echo "=== End Debug ==="
+    # Assume role using OIDC token
+    - >
+      STS_OUTPUT=$(aws sts assume-role-with-web-identity
+      --role-arn "$ROLE_ARN"
+      --role-session-name "GitLabRunner-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
+      --web-identity-token $GITLAB_OIDC_TOKEN
+      --duration-seconds 3600
+      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]'
+      --output text)
+    - export AWS_ACCESS_KEY_ID=$(echo $STS_OUTPUT | awk '{print $1}')
+    - export AWS_SECRET_ACCESS_KEY=$(echo $STS_OUTPUT | awk '{print $2}')
+    - export AWS_SESSION_TOKEN=$(echo $STS_OUTPUT | awk '{print $3}')
     - aws sts get-caller-identity
-    # Store the access token before assuming the environment provisioning role
+    # Store the access token
     - ACCESS_TOKEN=`aws secretsmanager get-secret-value --secret-id opa-admin-gitlab-secrets --region ${OPA_PLATFORM_REGION} | jq --raw-output '.SecretString' | jq -r .apiToken`
-    - ROLE_OUTPUT=$(aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "pipelineJob-$AWS_ACCOUNT" --duration-second=3600 --output json)
-    - export AWS_ACCESS_KEY_ID=$(echo ${ROLE_OUTPUT} | jq -r '.Credentials.AccessKeyId')
-    - export AWS_SECRET_ACCESS_KEY=$(echo ${ROLE_OUTPUT} | jq -r '.Credentials.SecretAccessKey')
-    - export AWS_SESSION_TOKEN=$(echo ${ROLE_OUTPUT} | jq -r '.Credentials.SessionToken')
-    - aws sts get-caller-identity
     - echo -e "\e[0Ksection_end:`date +%s`:aws_identity\r\e[0K"
 
   script:
