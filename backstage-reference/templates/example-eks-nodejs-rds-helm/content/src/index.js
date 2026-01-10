@@ -72,7 +72,10 @@ const connectDb = async (secret, region) => {
       host: secretValues.host,
       database: secretValues.dbname,
       password: secretValues.password,
-      port: secretValues.port
+      port: secretValues.port,
+      ssl: {
+        rejectUnauthorized: false
+      }
     })
     console.log("Making a connection to db...")
     await client.connect()
