@@ -69,7 +69,8 @@ const ResourceBindingCard = ({
     const currentEnvironment = awsComponent.currentEnvironment.environment.name;
 
     const matchedResources = resourcesEntities.filter(entity => {
-      const appData = entity!.metadata["appData"] as any;
+      if (!entity?.metadata) return false;
+      const appData = entity.metadata["appData"] as any;
       return appData && appData[currentEnvironment]
     })
 
