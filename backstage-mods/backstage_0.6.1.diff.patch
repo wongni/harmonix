@@ -62,8 +62,8 @@ diff -Naur --exclude=node_modules --exclude=catalog-info.yaml --exclude=*harmoni
      #   token: ${GHE_TOKEN}
 +  gitlab:
 +    - host: ${GITLAB_HOSTNAME}
-+      apiBaseUrl: https://${GITLAB_HOSTNAME}/api/v4
-+      baseUrl: https://${GITLAB_HOSTNAME}
++      apiBaseUrl: ${GITLAB_URL}/api/v4
++      baseUrl: ${GITLAB_URL}
 +      token: ${SECRET_GITLAB_CONFIG_PROP_apiToken}
  
  proxy:

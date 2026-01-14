@@ -18,12 +18,31 @@ if [[ -z "${GITLAB_TOKEN:-}" ]]; then
   exit 1
 fi
 
+# Get namespace ID for the group/user
+namespace_response=$(curl -k -s -w "%{http_code}" -H "PRIVATE-TOKEN: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/namespaces?search=$GITLAB_USER_NAME")
+namespace_exit=$?
+
+if [[ $namespace_exit -ne 0 ]]; then
+  echo "ERROR: Failed to fetch namespace ID"
+  exit $namespace_exit
+fi
+
+namespace_http_code=${namespace_response: -3}
+namespace_body=${namespace_response:0:${#namespace_response}-3}
+
+# Extract namespace_id from the first matching namespace
+NAMESPACE_ID=$(echo "$namespace_body" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+
+if [[ -z "$NAMESPACE_ID" ]]; then
+  echo "ERROR: Could not find namespace ID for $GITLAB_USER_NAME"
+  exit 1
+fi
+
 # Try to create a new project if one doesn't exist (will fail through)
 retry_count=0
-max_retries=30
+max_retries=5
 while [ $retry_count -lt $max_retries ]; do
-  response=$(curl -s -w "%{http_code}" -H "Content-Type:application/json" "https://$GITLAB_HOSTNAME/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\" ,  \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }")
-  echo $response
+  response=$(curl -s -w "%{http_code}" -H "Content-Type:application/json" "$GITLAB_URL/api/v4/projects?private_token=$GITLAB_TOKEN" -d "{ \"name\": \"backstage-reference\", \"namespace_id\": $NAMESPACE_ID, \"visibility\": \"$GIBLAB_PROJECT_VISIBILITY\" }")
   http_code=${response: -3}
   response_body=${response:0:${#response}-3}
   
@@ -56,8 +75,8 @@ if [ -d "$appDir/git-temp" ]; then
 fi
 # Make tmp directory to add files that will be comitted to repo
 mkdir -p $appDir/git-temp
-echo -e "\nCloning from https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git\n"
-git -C $appDir/git-temp clone -q "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
+echo -e "\nCloning from $GITLAB_URL/$GITLAB_USER_NAME/backstage-reference.git\n"
+git -C $appDir/git-temp clone -q "$GITLAB_PROTOCOL://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
 
 # Reinstate Git configs if available
 if [ -f "$appDir/git-config-temp" ]; then
@@ -82,21 +101,23 @@ cd $appDir/git-temp/backstage-reference;
 
 # Replace variable placeholders with env specific information
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_env_group *}}/$GITLAB_ENV_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_app_group *}}/$GITLAB_APP_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *gitlab_resource_group *}}/$GITLAB_RESOURCE_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "" "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_hostname *}}|$GITLAB_HOSTNAME|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_url *}}|$GITLAB_URL|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_user_name *}}|$GITLAB_USER_NAME|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_env_providers_group *}}|$GITLAB_ENV_PROVIDERS_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_env_group *}}|$GITLAB_ENV_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_app_group *}}|$GITLAB_APP_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *gitlab_resource_group *}}|$GITLAB_RESOURCE_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "" "s|\\\${{ *awsAccount *}}|$AWS_ACCOUNT_ID|g" {} +; 
 else
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_hostname *}}/$GITLAB_HOSTNAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_user_name *}}/$GITLAB_USER_NAME/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_env_providers_group *}}/$GITLAB_ENV_PROVIDERS_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_env_group *}}/$GITLAB_ENV_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_app_group *}}/$GITLAB_APP_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *gitlab_resource_group *}}/$GITLAB_RESOURCE_GROUP/g" {} +; 
-    find . -type f -name "*.yaml" -exec sed -i "s/\\\${{ *awsAccount *}}/$AWS_ACCOUNT_ID/g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_hostname *}}|$GITLAB_HOSTNAME|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_url *}}|$GITLAB_URL|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_user_name *}}|$GITLAB_USER_NAME|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_env_providers_group *}}|$GITLAB_ENV_PROVIDERS_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_env_group *}}|$GITLAB_ENV_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_app_group *}}|$GITLAB_APP_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *gitlab_resource_group *}}|$GITLAB_RESOURCE_GROUP|g" {} +; 
+    find . -type f -name "*.yaml" -exec sed -i "s|\\\${{ *awsAccount *}}|$AWS_ACCOUNT_ID|g" {} +; 
 fi
 
 echo "Checking for git-defender"
@@ -110,7 +131,7 @@ if [[ ! -z "$IS_DEFENDER" ]] && ! grep -q "\[defender\]" .git/config ; then
   echo -e "\nGit Defender detected. Populating git-temp/.git/config for Defender.\n"
   echo -e "" >> .git/config
   echo -e "[defender]" >> .git/config
-  echo -e "\tallowrepo = https://$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git" >> .git/config
+  echo -e "\tallowrepo = $GITLAB_URL/$GITLAB_USER_NAME/backstage-reference.git" >> .git/config
   echo -e "\tallowemail = $(whoami)@amazon.com" >> .git/config
   echo -e "\tregistered = true" >> .git/config
   echo -e "" >> .git/config
@@ -137,7 +158,7 @@ if [ -n "$(git status --porcelain=v1 2>/dev/null)" ]; then
     echo "ERROR: GITLAB_TOKEN is not set"
     exit 1
   fi
-  git remote set-url origin "https://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
+  git remote set-url origin "$GITLAB_PROTOCOL://oauth2:$GITLAB_TOKEN@$GITLAB_HOSTNAME/$GITLAB_USER_NAME/backstage-reference.git"
   
   # Push to git.  If the command fails, retry up to 5 times with a sleep between retries
   while ! git push; do

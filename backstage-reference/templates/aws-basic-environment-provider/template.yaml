@@ -162,7 +162,7 @@ spec:
       action: fetch:plain
       input:
         targetPath: ./.iac
-        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments"
+        url: "${{ gitlab_url }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments"
     - id: publish
       name: Publish
       action: publish:gitlab

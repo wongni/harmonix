@@ -123,7 +123,7 @@ spec:
       name: Fetch ECS Infrastructure as Code
       action: fetch:template
       input: 
-        url: https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_ecs
+        url: ${{ gitlab_url }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/common/aws_ecs
         targetPath: ./.iac
         values:
           gitlab_user_name: ${{ gitlab_user_name }}

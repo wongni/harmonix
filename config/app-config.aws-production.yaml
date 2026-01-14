@@ -90,8 +90,8 @@ auth:
 integrations:
   gitlab:
     - host: ${GITLAB_HOSTNAME}
-      apiBaseUrl: https://${GITLAB_HOSTNAME}/api/v4
-      baseUrl: https://${GITLAB_HOSTNAME}
+      apiBaseUrl: ${GITLAB_URL}/api/v4
+      baseUrl: ${GITLAB_URL}
       token: ${GITLAB_ADMIN_TOKEN}
 
 scaffolder:
@@ -135,7 +135,7 @@ catalog:
   locations:
     # AWS templates
     - type: url
-      target: https://${GITLAB_HOSTNAME}/${GITLAB_USER_NAME}/backstage-reference/-/blob/main/templates/all-templates.yaml
+      target: ${GITLAB_URL}/${GITLAB_USER_NAME}/backstage-reference/-/blob/main/templates/all-templates.yaml
       rules:
         - allow: [Location, Template]
   providers:

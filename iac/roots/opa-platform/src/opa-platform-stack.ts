@@ -111,7 +111,7 @@ export class OPAPlatformStack extends cdk.Stack {
       opaEnv: opaParams,
       key,
       gitlabHostName: getEnvVarValue(process.env.GITLAB_HOSTNAME) || "gitlab.com",
-      gitlabUrl: `https://${getEnvVarValue(process.env.GITLAB_HOSTNAME)}` || "https://gitlab.com",
+      gitlabUrl: getEnvVarValue(process.env.GITLAB_URL) || "https://gitlab.com",
       githubHostName: getEnvVarValue(process.env.GITHUB_HOSTNAME) || "github.com",
       githubUrl: `https://${getEnvVarValue(process.env.GITHUB_HOSTNAME)}` || "https://github.com",
     });

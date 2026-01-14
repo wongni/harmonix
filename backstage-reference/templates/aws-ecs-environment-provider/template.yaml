@@ -203,13 +203,13 @@ spec:
       action: fetch:plain
       input:
         targetPath: ./.iac/opa-ecs-environment
-        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-ecs-environment"
+        url: "${{ gitlab_url }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-ecs-environment"
     - id: fetchIacCommonConstructs
       name: Fetch IaC Common Constructs
       action: fetch:plain
       input:
         targetPath: ./.iac/opa-common-constructs
-        url: "https://${{ gitlab_hostname }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-common-constructs"
+        url: "${{ gitlab_url }}/${{ gitlab_user_name }}/backstage-reference/-/tree/main/environments/opa-common-constructs"
     - id: createYarnPackageFile
       name: Configure Yarn Package Manager
       action: harmonix:fs:write
