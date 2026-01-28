@@ -1,0 +1,10 @@
+<server description="Example Java Microservice">
+    <featureManager>
+        <feature>restfulWS-3.1</feature>
+        <feature>jsonb-3.0</feature>
+    </featureManager>
+
+    <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="${{ values.appPort }}" />
+
+    <webApplication location="${{ values.component_id }}.war" contextRoot="/" />
+</server>

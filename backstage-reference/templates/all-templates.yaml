@@ -9,6 +9,7 @@ spec:
         - ./example-nodejs/template.yaml
         - ./example-springboot/template.yaml
         - ./example-springboot-eks/template.yaml
+        - ./example-java-microservice/template.yaml
         # - ./example-eks-note-app/template.yaml
         - ./example-serverless-rest-api/template.yaml
         - ./example-nodejs-rds/template.yaml
